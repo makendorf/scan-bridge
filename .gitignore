@@ -1,0 +1,25 @@
+## Build
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+## IDE
+.vs/
+.idea/
+*.sln.docstates
+
+## Logs
+logs/
+*.log
+
+## Database
+*.db
+
+## OS
+Thumbs.db
+.DS_Store

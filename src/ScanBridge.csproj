@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-xTrack_Mercury_Scan-b3bef648-f4ed-4c17-95c9-fc37b6c2c22a</UserSecretsId>
+    <RootNamespace>ScanBridge</RootNamespace>
+    <AssemblyName>ScanBridge</AssemblyName>
+    <Product>ScanBridge</Product>
+    <Company>ScanBridge</Company>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentFTP" Version="54.2.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.9" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="SSH.NET" Version="2024.*" />
+    <PackageReference Include="System.IO.Ports" Version="10.0.9" />
+  </ItemGroup>
+</Project>

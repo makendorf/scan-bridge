@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>СканМост</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #1a1d29, #252836); padding: 20px 30px; border-bottom: 1px solid #2d3148; display: flex; align-items: center; gap: 15px; }
+        .header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+        .header .subtitle { color: #8b8fa3; font-size: 13px; }
+        .tabs { display: flex; gap: 0; margin: 20px auto 0; max-width: 900px; padding: 0 20px; }
+        .tab { padding: 10px 20px; background: #1a1d29; border: 1px solid #2d3148; border-bottom: none; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 14px; color: #8b8fa3; transition: all 0.15s; }
+        .tab:hover { color: #e0e0e0; background: #252836; }
+        .tab.active { color: #fff; background: #252836; border-color: #2563eb40; border-bottom-color: #252836; }
+        .container { max-width: 900px; margin: 0 auto; padding: 0 20px 30px; }
+        .card { background: #1a1d29; border: 1px solid #2d3148; border-radius: 0 10px 10px 10px; padding: 24px; }
+        .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #fff; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 10px 12px; font-size: 12px; text-transform: uppercase; color: #8b8fa3; border-bottom: 1px solid #2d3148; }
+        td { padding: 12px; border-bottom: 1px solid #1e2130; font-size: 14px; }
+        tr:hover td { background: #252836; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #2d3148; color: #8b8fa3; }
+        .badge-green { background: #1a3a2a; color: #4ade80; }
+        .actions { display: flex; gap: 6px; }
+        .btn { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+        .btn-edit { background: #2563eb20; color: #60a5fa; border: 1px solid #2563eb40; }
+        .btn-edit:hover { background: #2563eb40; }
+        .btn-delete { background: #dc262620; color: #f87171; border: 1px solid #dc262640; }
+        .btn-delete:hover { background: #dc262640; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-cancel { background: #374151; color: #d1d5db; }
+        .btn-cancel:hover { background: #4b5563; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 12px; color: #8b8fa3; text-transform: uppercase; }
+        .form-group input, .form-group select { background: #0f1117; border: 1px solid #2d3148; color: #e0e0e0; padding: 8px 12px; border-radius: 6px; font-size: 14px; outline: none; }
+        .form-group input:focus, .form-group select:focus { border-color: #2563eb; }
+        .form-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+        .empty { text-align: center; padding: 30px; color: #8b8fa3; }
+        .hidden { display: none; }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 100; animation: slideIn 0.3s ease; }
+        .toast-success { background: #1a3a2a; color: #4ade80; border: 1px solid #4ade8040; }
+        .toast-error { background: #3a1a1a; color: #f87171; border: 1px solid #f8717140; }
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .settings-bar { display: flex; gap: 20px; align-items: center; margin-bottom: 16px; padding: 12px 16px; background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; font-size: 13px; }
+        .settings-bar label { color: #8b8fa3; }
+        .settings-bar select { background: #1a1d29; border: 1px solid #2d3148; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+
+        .log-panel { background: #0a0c10; border: 1px solid #2d3148; border-radius: 6px; height: 500px; overflow-y: auto; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 13px; }
+        .log-line { padding: 4px 12px; border-bottom: 1px solid #14161e; display: flex; gap: 10px; }
+        .log-line:hover { background: #14161e; }
+        .log-time { color: #555; min-width: 75px; }
+        .log-level { min-width: 50px; font-weight: 600; }
+        .log-level-INF { color: #4ade80; }
+        .log-level-WRN { color: #fbbf24; }
+        .log-level-ERR { color: #f87171; }
+        .log-level-DBG { color: #8b8fa3; }
+        .log-msg { color: #c8ccd8; word-break: break-all; }
+        .log-exc { color: #f8717180; font-size: 12px; margin-top: 4px; white-space: pre-wrap; }
+        .log-toolbar { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+        .log-toolbar label { font-size: 13px; color: #8b8fa3; }
+        .log-toolbar input[type=checkbox] { accent-color: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>СканМост</h1>
+        <span class="subtitle">Управление сканерами</span>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('scanners')">Сканеры</div>
+        <div class="tab" onclick="switchTab('actions')">Действия</div>
+        <div class="tab" onclick="switchTab('logs')">Логи</div>
+    </div>
+
+    <div class="container">
+        <div id="tab-scanners" class="card">
+            <div class="settings-bar">
+                <label>Переподключение:</label>
+                <select id="reconnectMode" onchange="saveReconnectMode()">
+                    <option value="single">Только изменённый сканер</option>
+                    <option value="all">Все сканеры</option>
+                </select>
+                <span style="color:#8b8fa3;font-size:12px">— при сохранении изменений</span>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h2>Сканеры</h2>
+                <button class="btn btn-primary" onclick="showAdd()">+ Добавить сканер</button>
+            </div>
+            <table id="scannersTable">
+                <thead>
+                    <tr><th>Имя</th><th>Порт</th><th>Скорость</th><th>Данные/Чётность/Стоп</th><th>Управление потоком</th><th></th></tr>
+                </thead>
+                <tbody id="scannersBody"></tbody>
+            </table>
+            <div id="emptyState" class="empty hidden">Сканеры не настроены</div>
+        </div>
+
+        <div id="tab-actions" class="card hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h2>Действия после сканирования</h2>
+                <button class="btn btn-primary" onclick="showAddAction()">+ Добавить действие</button>
+            </div>
+            <div style="margin-bottom:12px;padding:10px 14px;background:#0f1117;border:1px solid #2d3148;border-radius:8px;font-size:13px;color:#8b8fa3">
+                Действия выполняются последовательно после каждого сканирования. Порядок можно менять стрелками.
+            </div>
+            <table id="actionsTable">
+                <thead>
+                    <tr><th>Сканер</th><th>Тип</th><th>Включено</th><th>Настройки</th><th></th></tr>
+                </thead>
+                <tbody id="actionsBody"></tbody>
+            </table>
+            <div id="actionsEmpty" class="empty hidden">Нет настроенных действий</div>
+        </div>
+
+        <div id="actionEditor" class="card hidden">
+            <h2 id="actionEditorTitle">Добавить действие</h2>
+            <input type="hidden" id="editActionIndex" value="-1">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Сканер</label>
+                    <select id="fActionScanner"></select>
+                </div>
+                <div class="form-group">
+                    <label>Тип действия</label>
+                    <select id="fActionType">
+                        <option value="Log">Логирование (Log)</option>
+                        <option value="Replacement">Замена символов (Replacement)</option>
+                        <option value="ClipboardPaste">Вставка в окно (ClipboardPaste)</option>
+                        <option value="Export">Экспорт (Export)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Включено</label>
+                    <select id="fActionEnabled">
+                        <option value="true">Да</option>
+                        <option value="false">Нет</option>
+                    </select>
+                </div>
+            </div>
+            <div id="actionSettings" class="form-grid" style="margin-top:12px"></div>
+            <div class="form-actions">
+                <button class="btn btn-cancel" onclick="hideActionEditor()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveAction()">Сохранить</button>
+            </div>
+        </div>
+
+        <div id="tab-logs" class="card hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h2>Логи</h2>
+                <button class="btn btn-cancel" onclick="clearLogs()">Очистить</button>
+            </div>
+            <div class="log-toolbar">
+                <label><input type="checkbox" id="autoScroll" checked> Автопрокрутка</label>
+                <label><input type="checkbox" id="showINF" checked> INF</label>
+                <label><input type="checkbox" id="showWRN" checked> WRN</label>
+                <label><input type="checkbox" id="showERR" checked> ERR</label>
+                <label><input type="checkbox" id="showDBG"> DBG</label>
+            </div>
+            <div class="log-panel" id="logPanel"></div>
+        </div>
+
+        <div id="editor" class="card hidden">
+            <h2 id="editorTitle">Добавить сканер</h2>
+            <input type="hidden" id="editIndex" value="-1">
+            <div class="form-grid">
+                <div class="form-group"><label>Имя</label><input id="fName" placeholder="напр. Основной"></div>
+                <div class="form-group">
+                    <label>COM-порт</label>
+                    <select id="fPort"><option value="">Загрузка...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Скорость (бод)</label>
+                    <select id="fBaud"><option>9600</option><option>19200</option><option>38400</option><option>57600</option><option>115200</option></select>
+                </div>
+                <div class="form-group"><label>Биты данных</label><select id="fDataBits"><option>7</option><option selected>8</option></select></div>
+                <div class="form-group"><label>Чётность</label><select id="fParity"><option selected>None</option><option>Odd</option><option>Even</option><option>Mark</option><option>Space</option></select></div>
+                <div class="form-group"><label>Стоп-биты</label><select id="fStopBits"><option selected>One</option><option>OnePointFive</option><option>Two</option></select></div>
+                <div class="form-group">
+                    <label>Управление потоком</label>
+                    <select id="fHandshake"><option selected>RequestToSend</option><option>None</option><option>XOnXOff</option><option>RequestToSendXOnXOff</option></select>
+                </div>
+                <div class="form-group"><label>Таймаут чтения (мс)</label><input id="fReadTimeout" type="number" value="5000"></div>
+                <div class="form-group"><label>Таймаут записи (мс)</label><input id="fWriteTimeout" type="number" value="5000"></div>
+            </div>
+            <div id="scannerActionsSection" style="margin-top:16px;display:none">
+                <div style="font-size:12px;color:#8b8fa3;text-transform:uppercase;margin-bottom:8px">Назначенные действия</div>
+                <div id="scannerActionsList"></div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-cancel" onclick="hideEditor()">Отмена</button>
+                <button class="btn btn-primary" onclick="save()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scanners = [];
+        let logEntries = [];
+        let logTimer = null;
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+            document.getElementById('tab-scanners').classList.toggle('hidden', tab !== 'scanners');
+            document.getElementById('tab-actions').classList.toggle('hidden', tab !== 'actions');
+            document.getElementById('tab-logs').classList.toggle('hidden', tab !== 'logs');
+            if (tab === 'logs') { loadLogs(); startLogPolling(); }
+            else { stopLogPolling(); }
+            if (tab === 'actions') loadActions();
+        }
+
+        function startLogPolling() { stopLogPolling(); logTimer = setInterval(loadLogs, 1000); }
+        function stopLogPolling() { if (logTimer) { clearInterval(logTimer); logTimer = null; } }
+
+        async function loadLogs() {
+            const res = await fetch('/api/logs');
+            logEntries = await res.json();
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const panel = document.getElementById('logPanel');
+            const showINF = document.getElementById('showINF').checked;
+            const showWRN = document.getElementById('showWRN').checked;
+            const showERR = document.getElementById('showERR').checked;
+            const showDBG = document.getElementById('showDBG').checked;
+            const filtered = logEntries.filter(e => {
+                if (e.level === 'INF' && !showINF) return false;
+                if (e.level === 'WRN' && !showWRN) return false;
+                if (e.level === 'ERR' && !showERR) return false;
+                if (e.level === 'DBG' && !showDBG) return false;
+                return true;
+            }).reverse();
+            const wasAtBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 30;
+            panel.innerHTML = filtered.map(e => {
+                const time = new Date(e.timestamp).toLocaleTimeString('ru-RU');
+                const exc = e.exception ? `<div class="log-exc">${esc(e.exception)}</div>` : '';
+                return `<div class="log-line"><span class="log-time">${time}</span><span class="log-level log-level-${e.level}">${e.level}</span><span class="log-msg">${esc(e.message)}${exc}</span></div>`;
+            }).join('');
+            if (wasAtBottom || document.getElementById('autoScroll').checked)
+                panel.scrollTop = panel.scrollHeight;
+        }
+
+        document.querySelectorAll('.log-toolbar input').forEach(cb => cb.addEventListener('change', renderLogs));
+        async function clearLogs() {
+            await fetch('/api/logs', { method: 'DELETE' });
+            logEntries = [];
+            renderLogs();
+        }
+
+        async function loadSettings() {
+            const res = await fetch('/api/settings/reconnect');
+            const data = await res.json();
+            document.getElementById('reconnectMode').value = data.mode;
+        }
+
+        async function saveReconnectMode() {
+            const mode = document.getElementById('reconnectMode').value;
+            await fetch('/api/settings/reconnect', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+        }
+
+        async function load() {
+            const res = await fetch('/api/scanners');
+            scanners = await res.json();
+            render();
+        }
+
+        function render() {
+            const tbody = document.getElementById('scannersBody');
+            const empty = document.getElementById('emptyState');
+            if (scanners.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+            empty.classList.add('hidden');
+            tbody.innerHTML = scanners.map((s, i) => `
+                <tr>
+                    <td><strong>${esc(s.name)}</strong></td>
+                    <td><span class="badge badge-green">${esc(s.portName)}</span></td>
+                    <td>${s.baudRate}</td>
+                    <td>${s.dataBits} / ${esc(s.parity)} / ${esc(s.stopBits)}</td>
+                    <td>${esc(s.handshake)}</td>
+                    <td class="actions">
+                        <button class="btn btn-edit" onclick="restart('${esc(s.name)}')">Перезапуск</button>
+                        <button class="btn btn-edit" onclick="edit(${i})">Изменить</button>
+                        <button class="btn btn-delete" onclick="remove(${i})">Удалить</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        async function loadPorts(selectedPort) {
+            const sel = document.getElementById('fPort');
+            try {
+                const res = await fetch('/api/ports');
+                const ports = await res.json();
+                sel.innerHTML = '';
+                if (ports.length === 0) {
+                    sel.innerHTML = '<option value="">Нет доступных портов</option>';
+                    return;
+                }
+                ports.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p;
+                    opt.textContent = p;
+                    sel.appendChild(opt);
+                });
+                if (selectedPort) {
+                    if (!ports.includes(selectedPort)) {
+                        const opt = document.createElement('option');
+                        opt.value = selectedPort;
+                        opt.textContent = selectedPort + ' (не в системе)';
+                        sel.appendChild(opt);
+                    }
+                    sel.value = selectedPort;
+                }
+            } catch {
+                sel.innerHTML = '<option value="">Ошибка загрузки</option>';
+            }
+        }
+
+        async function showAdd() {
+            document.getElementById('editorTitle').textContent = 'Добавить сканер';
+            document.getElementById('editIndex').value = -1;
+            document.getElementById('fName').value = '';
+            document.getElementById('fBaud').value = '9600';
+            document.getElementById('fDataBits').value = '8';
+            document.getElementById('fParity').value = 'None';
+            document.getElementById('fStopBits').value = 'One';
+            document.getElementById('fHandshake').value = 'RequestToSend';
+            document.getElementById('fReadTimeout').value = '5000';
+            document.getElementById('fWriteTimeout').value = '5000';
+            await loadPorts();
+            document.getElementById('editor').classList.remove('hidden');
+        }
+
+        async function edit(i) {
+            const s = scanners[i];
+            document.getElementById('editorTitle').textContent = 'Редактировать сканер';
+            document.getElementById('editIndex').value = i;
+            document.getElementById('fName').value = s.name;
+            document.getElementById('fBaud').value = s.baudRate;
+            document.getElementById('fDataBits').value = s.dataBits;
+            document.getElementById('fParity').value = s.parity;
+            document.getElementById('fStopBits').value = s.stopBits;
+            document.getElementById('fHandshake').value = s.handshake;
+            document.getElementById('fReadTimeout').value = s.readTimeout;
+            document.getElementById('fWriteTimeout').value = s.writeTimeout;
+            await loadPorts(s.portName);
+            showScannerActions(s.name);
+            document.getElementById('editor').classList.remove('hidden');
+        }
+
+        function showScannerActions(scannerName) {
+            const section = document.getElementById('scannerActionsSection');
+            const list = document.getElementById('scannerActionsList');
+            const matched = postScanActions.filter(a => a.scannerName === scannerName);
+            if (matched.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+            list.innerHTML = matched.map((a, i) => {
+                const typeName = ACTION_TYPES[a.type]?.name || a.type;
+                const enabledBadge = a.enabled
+                    ? '<span class="badge badge-green">Вкл</span>'
+                    : '<span class="badge">Выкл</span>';
+                return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #1e2130">
+                    <span style="flex:1;font-size:13px">${esc(typeName)} ${enabledBadge}</span>
+                    <button class="btn btn-edit" style="font-size:11px;padding:3px 8px" onclick="editActionByName('${esc(a.type)}', '${esc(scannerName)}')">Изменить</button>
+                </div>`;
+            }).join('');
+        }
+
+        function editActionByName(type, scannerName) {
+            const idx = postScanActions.findIndex(a => a.type === type && a.scannerName === scannerName);
+            if (idx >= 0) {
+                hideEditor();
+                editAction(idx);
+            }
+        }
+
+        function hideEditor() { document.getElementById('editor').classList.add('hidden'); }
+
+        function getFormData() {
+            return {
+                name: document.getElementById('fName').value.trim(),
+                portName: document.getElementById('fPort').value.trim(),
+                baudRate: parseInt(document.getElementById('fBaud').value),
+                dataBits: parseInt(document.getElementById('fDataBits').value),
+                parity: document.getElementById('fParity').value,
+                stopBits: document.getElementById('fStopBits').value,
+                handshake: document.getElementById('fHandshake').value,
+                readTimeout: parseInt(document.getElementById('fReadTimeout').value),
+                writeTimeout: parseInt(document.getElementById('fWriteTimeout').value)
+            };
+        }
+
+        async function save() {
+            const data = getFormData();
+            if (!data.name || !data.portName) { toast('Имя и порт обязательны', true); return; }
+            const idx = parseInt(document.getElementById('editIndex').value);
+            const method = idx === -1 ? 'POST' : 'PUT';
+            const url = idx === -1 ? '/api/scanners' : `/api/scanners/${idx}`;
+            const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            if (res.ok) {
+                const result = await res.json();
+                scanners = result.scanners;
+                render();
+                hideEditor();
+                if (result.conflict)
+                    toast(`Порт ${data.portName} был у сканера «${result.conflict}» — он остановлен`);
+                else
+                    toast('Сканер сохранён, COM переподключён');
+            } else { toast('Ошибка сохранения сканера', true); }
+        }
+
+        async function remove(i) {
+            if (!confirm(`Удалить сканер «${scanners[i].name}»?`)) return;
+            const res = await fetch(`/api/scanners/${i}`, { method: 'DELETE' });
+            if (res.ok) { await load(); toast('Сканер удалён'); }
+            else { toast('Ошибка удаления сканера', true); }
+        }
+
+        async function restart(name) {
+            const res = await fetch(`/api/scanners/${encodeURIComponent(name)}/restart`, { method: 'POST' });
+            if (res.ok) { toast(`Сканер «${name}» перезапущен`); }
+            else { toast('Ошибка перезапуска сканера', true); }
+        }
+
+        function toast(msg, isError) {
+            const t = document.createElement('div');
+            t.className = 'toast ' + (isError ? 'toast-error' : 'toast-success');
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 2500);
+        }
+
+        load();
+        loadSettings();
+
+        let postScanActions = [];
+
+        const ACTION_TYPES = {
+            Log: { name: 'Логирование', settings: [] },
+            Replacement: {
+                name: 'Замена символов',
+                settings: [
+                    { key: 'Replacements', label: 'Правила замены', type: 'replacements' }
+                ]
+            },
+            ClipboardPaste: {
+                name: 'Вставка в окно',
+                settings: [
+                    { key: 'AppendNewline', label: 'Добавить перенос строки', type: 'select', options: ['false', 'true'], default: 'false' },
+                    { key: 'DelayMs', label: 'Задержка перед вставкой (мс)', type: 'number', default: '50' }
+                ]
+            },
+            Export: {
+                name: 'Экспорт',
+                settings: [
+                    { key: 'Destination', label: 'Назначение', type: 'select', options: ['folder', 'ftp', 'sftp', 'http'], default: 'folder',
+                      optionLabels: { folder: 'Локальная папка', ftp: 'FTP-сервер', sftp: 'SFTP-сервер', http: 'HTTP POST' } },
+                    { key: 'FolderPath', label: 'Папка для файлов', type: 'text', default: 'C:\\Output', showWhen: 'Destination=folder' },
+                    { key: 'FtpHost', label: 'Хост', type: 'text', default: '', showWhen: 'Destination=ftp|sftp' },
+                    { key: 'FtpPort', label: 'Порт', type: 'number', default: '21', showWhen: 'Destination=ftp|sftp' },
+                    { key: 'FtpUser', label: 'Логин', type: 'text', default: '', showWhen: 'Destination=ftp|sftp' },
+                    { key: 'FtpPass', label: 'Пароль', type: 'text', default: '', showWhen: 'Destination=ftp|sftp' },
+                    { key: 'FtpRemotePath', label: 'Удалённая папка', type: 'text', default: '/', showWhen: 'Destination=ftp|sftp' },
+                    { key: 'FtpPassive', label: 'Пассивный режим (FTP)', type: 'select', options: ['true', 'false'], default: 'true', showWhen: 'Destination=ftp' },
+                    { key: 'HttpUrl', label: 'URL API', type: 'text', default: 'http://localhost/api/scan', showWhen: 'Destination=http',
+                      hint: 'Полный URL эндпоинта для POST-запроса' },
+                    { key: 'HttpContentType', label: 'Content-Type', type: 'text', default: '', showWhen: 'Destination=http',
+                      hint: 'Оставьте пустым для автопределения (application/json или application/xml)' },
+                    { key: 'HttpHeaders', label: 'Заголовки (JSON)', type: 'text', default: '{}', showWhen: 'Destination=http',
+                      hint: 'Дополнительные заголовки в формате JSON:\n{"Authorization": "Bearer token", "X-Custom": "value"}' },
+                    { key: 'Format', label: 'Формат', type: 'select', options: ['json', 'xml'], default: 'json' },
+                    { key: 'FilenameTemplate', label: 'Шаблон имени файла', type: 'text', default: '{timestamp}_{scanner}_{data}',
+                      hint: '{timestamp} — дата/время (yyyyMMdd_HHmmss_fff)\n{scanner} — имя сканера\n{data} — распознанные данные\n{format} — формат штрихкода' },
+                    { key: 'Tags', label: 'Теги в файле', type: 'tags' }
+                ]
+            }
+        };
+
+        async function loadActions() {
+            const res = await fetch('/api/postscan/actions');
+            const data = await res.json();
+            postScanActions = data.configs || [];
+            renderActions();
+        }
+
+        function renderActions() {
+            const tbody = document.getElementById('actionsBody');
+            const empty = document.getElementById('actionsEmpty');
+            if (postScanActions.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+            empty.classList.add('hidden');
+            tbody.innerHTML = postScanActions.map((a, i) => {
+                const typeName = ACTION_TYPES[a.type]?.name || a.type;
+                const scannerLabel = a.scannerName
+                    ? `<span class="badge badge-green">${esc(a.scannerName)}</span>`
+                    : '<span class="badge">Все</span>';
+                const enabledBadge = a.enabled
+                    ? '<span class="badge badge-green">Вкл</span>'
+                    : '<span class="badge">Выкл</span>';
+                const settingsStr = a.settings && Object.keys(a.settings).length > 0
+                    ? Object.entries(a.settings).filter(([k]) => k !== 'Replacements').map(([k, v]) => `${k}=${v}`).join(', ')
+                    : '—';
+                const upBtn = i > 0 ? `<button class="btn btn-edit" onclick="moveAction(${i},-1)" title="Вверх">&#9650;</button>` : '';
+                const downBtn = i < postScanActions.length - 1 ? `<button class="btn btn-edit" onclick="moveAction(${i},1)" title="Вниз">&#9660;</button>` : '';
+                return `<tr>
+                    <td>${scannerLabel}</td>
+                    <td><strong>${esc(typeName)}</strong></td>
+                    <td>${enabledBadge}</td>
+                    <td style="font-size:12px;color:#8b8fa3">${esc(settingsStr)}</td>
+                    <td class="actions">
+                        ${upBtn}${downBtn}
+                        <button class="btn btn-edit" onclick="editAction(${i})">Изменить</button>
+                        <button class="btn btn-delete" onclick="removeAction(${i})">Удалить</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function populateActionScannerSelect(selectedScanner) {
+            const sel = document.getElementById('fActionScanner');
+            sel.innerHTML = '<option value="">Все сканеры</option>';
+            scanners.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name;
+                sel.appendChild(opt);
+            });
+            if (selectedScanner) sel.value = selectedScanner;
+        }
+
+        function showAddAction() {
+            document.getElementById('actionEditorTitle').textContent = 'Добавить действие';
+            document.getElementById('editActionIndex').value = -1;
+            document.getElementById('fActionType').value = 'ClipboardPaste';
+            document.getElementById('fActionEnabled').value = 'true';
+            populateActionScannerSelect('');
+            updateActionSettings('ClipboardPaste', {});
+            document.getElementById('actionEditor').classList.remove('hidden');
+        }
+
+        function editAction(i) {
+            const a = postScanActions[i];
+            document.getElementById('actionEditorTitle').textContent = 'Редактировать действие';
+            document.getElementById('editActionIndex').value = i;
+            document.getElementById('fActionType').value = a.type;
+            document.getElementById('fActionEnabled').value = a.enabled ? 'true' : 'false';
+            populateActionScannerSelect(a.scannerName || '');
+            updateActionSettings(a.type, a.settings || {});
+            document.getElementById('actionEditor').classList.remove('hidden');
+        }
+
+        function hideActionEditor() { document.getElementById('actionEditor').classList.add('hidden'); }
+
+        document.getElementById('fActionType').addEventListener('change', function() {
+            updateActionSettings(this.value, {});
+        });
+
+        let replacementRules = [];
+        let tagRules = [];
+
+        const TAG_SOURCES = [
+            { value: 'Timestamp', label: 'Время сканирования' },
+            { value: 'ScannerName', label: 'Имя сканера' },
+            { value: 'RawData', label: 'Исходные данные' },
+            { value: 'ParsedData', label: 'Распознанные данные' },
+            { value: 'Format', label: 'Формат кода' },
+            { value: 'IsValid', label: 'Валидность' },
+            { value: 'ContentType', label: 'Тип контента (URL/JSON/WiFi/...)' },
+            { value: 'ParsedContent', label: 'Распарсенный контент QR' },
+            { value: 'Custom', label: 'Своё значение' }
+        ];
+
+        function updateActionSettings(type, existing) {
+            const container = document.getElementById('actionSettings');
+            const def = ACTION_TYPES[type];
+            if (!def || def.settings.length === 0) { container.innerHTML = ''; return; }
+            container.innerHTML = def.settings.map(s => {
+                if (s.type === 'replacements') {
+                    const json = existing[s.key] || '[]';
+                    replacementRules = [];
+                    try { replacementRules = JSON.parse(json); } catch { replacementRules = []; }
+                    return `<div class="form-group" style="grid-column:1/-1" data-showwhen="${s.showWhen || ''}">
+                        <label>${s.label}</label>
+                        <div id="replacementsContainer"></div>
+                        <button class="btn btn-edit" style="margin-top:6px" onclick="addReplacement()">+ Добавить замену</button>
+                    </div>`;
+                }
+                if (s.type === 'tags') {
+                    const json = existing[s.key] || '[]';
+                    tagRules = [];
+                    try { tagRules = JSON.parse(json); } catch { tagRules = []; }
+                    if (tagRules.length === 0) {
+                        tagRules = TAG_SOURCES.filter(t => t.value !== 'Custom').map(t => ({ Key: t.value, Source: t.value }));
+                    }
+                    return `<div class="form-group" style="grid-column:1/-1" data-showwhen="${s.showWhen || ''}">
+                        <label>${s.label}</label>
+                        <div id="tagsContainer"></div>
+                        <button class="btn btn-edit" style="margin-top:6px" onclick="addTag()">+ Добавить тег</button>
+                    </div>`;
+                }
+                const val = existing[s.key] || s.default || '';
+                if (s.type === 'select') {
+                    const opts = s.options.map(o => {
+                        const lbl = s.optionLabels?.[o] || o;
+                        return `<option value="${o}" ${o === val ? 'selected' : ''}>${lbl}</option>`;
+                    }).join('');
+                    return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}</label><select id="set_${s.key}" onchange="onSettingChange()">${opts}</select></div>`;
+                }
+                const hint = s.hint ? `<div style="position:relative;display:inline-block;cursor:help;margin-left:4px" onmouseenter="this.querySelector('.tooltip').style.display='block'" onmouseleave="this.querySelector('.tooltip').style.display='none'"><span style="color:#8b8fa3;font-size:12px;border:1px solid #2d3148;border-radius:50%;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center">?</span><div class="tooltip" style="display:none;position:absolute;left:0;top:24px;background:#1a1d29;border:1px solid #2d3148;border-radius:6px;padding:10px 12px;z-index:50;width:280px;font-size:12px;color:#c8ccd8;white-space:pre-line;box-shadow:0 4px 12px rgba(0,0,0,.4)">${esc(s.hint)}</div></div>` : '';
+                return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}${hint}</label><input id="set_${s.key}" type="${s.type}" value="${esc(val)}"></div>`;
+            }).join('');
+            renderReplacements();
+            renderTags();
+            applyShowWhen();
+        }
+
+        function onSettingChange() {
+            applyShowWhen();
+        }
+
+        function applyShowWhen() {
+            const groups = document.querySelectorAll('#actionSettings [data-showwhen]');
+            groups.forEach(g => {
+                const rule = g.getAttribute('data-showwhen');
+                if (!rule) { g.style.display = ''; return; }
+                const match = rule.match(/^(\w+)=(.+)$/);
+                if (!match) { g.style.display = ''; return; }
+                const [, key, values] = match;
+                const allowed = values.split('|');
+                const el = document.getElementById('set_' + key);
+                const current = el ? el.value : '';
+                g.style.display = allowed.includes(current) ? '' : 'none';
+            });
+        }
+
+        function renderReplacements() {
+            const container = document.getElementById('replacementsContainer');
+            if (!container) return;
+            if (replacementRules.length === 0) {
+                container.innerHTML = '<div style="color:#555;font-size:12px;padding:6px 0">Нет замен</div>';
+                return;
+            }
+            container.innerHTML = replacementRules.map((r, i) => `
+                <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+                    <input id="rep_find_${i}" value="${esc(r.Find || '')}" placeholder="Найти" style="flex:1;background:#0f1117;border:1px solid #2d3148;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px">
+                    <span style="color:#555">→</span>
+                    <input id="rep_replace_${i}" value="${esc(r.Replace || '')}" placeholder="Заменить на" style="flex:1;background:#0f1117;border:1px solid #2d3148;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px">
+                    <select id="rep_mode_${i}" style="background:#0f1117;border:1px solid #2d3148;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px">
+                        <option value="All" ${r.Mode === 'All' ? 'selected' : ''}>Везде</option>
+                        <option value="Start" ${r.Mode === 'Start' ? 'selected' : ''}>В начале</option>
+                        <option value="End" ${r.Mode === 'End' ? 'selected' : ''}>В конце</option>
+                    </select>
+                    <button class="btn btn-delete" style="padding:4px 8px;font-size:12px" onclick="removeReplacement(${i})">×</button>
+                </div>
+            `).join('');
+        }
+
+        function addReplacement() {
+            replacementRules.push({ Find: '', Replace: '', Mode: 'All' });
+            renderReplacements();
+        }
+
+        function removeReplacement(i) {
+            replacementRules.splice(i, 1);
+            renderReplacements();
+        }
+
+        function collectReplacements() {
+            const container = document.getElementById('replacementsContainer');
+            if (!container) return [];
+            return replacementRules.map((r, i) => ({
+                Find: document.getElementById('rep_find_' + i)?.value ?? r.Find,
+                Replace: document.getElementById('rep_replace_' + i)?.value ?? r.Replace,
+                Mode: document.getElementById('rep_mode_' + i)?.value ?? r.Mode
+            }));
+        }
+
+        function renderTags() {
+            const container = document.getElementById('tagsContainer');
+            if (!container) return;
+            if (tagRules.length === 0) {
+                container.innerHTML = '<div style="color:#555;font-size:12px;padding:6px 0">Нет тегов</div>';
+                return;
+            }
+            container.innerHTML = tagRules.map((t, i) => {
+                const srcOpts = TAG_SOURCES.map(s =>
+                    `<option value="${s.value}" ${s.value === t.Source ? 'selected' : ''}>${s.label}</option>`
+                ).join('');
+                const isCustom = t.Source === 'Custom';
+                const valInput = isCustom
+                    ? `<input id="tag_val_${i}" value="${esc(t.Value || '')}" placeholder="Значение" style="flex:1;background:#0f1117;border:1px solid #2d3148;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px">`
+                    : '';
+                return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+                    <input id="tag_key_${i}" value="${esc(t.Key || '')}" placeholder="Имя тега" style="width:140px;background:#0f1117;border:1px solid #2d3148;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px">
+                    <select id="tag_src_${i}" onchange="onTagSourceChange(${i})" style="background:#0f1117;border:1px solid #2d3148;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px;width:180px">${srcOpts}</select>
+                    ${valInput}
+                    <button class="btn btn-delete" style="padding:4px 8px;font-size:12px" onclick="removeTag(${i})">×</button>
+                </div>`;
+            }).join('');
+        }
+
+        function onTagSourceChange(i) {
+            const sel = document.getElementById('tag_src_' + i);
+            if (sel) tagRules[i].Source = sel.value;
+            renderTags();
+        }
+
+        function addTag() {
+            tagRules.push({ Key: '', Source: 'ParsedData', Value: '' });
+            renderTags();
+        }
+
+        function removeTag(i) {
+            tagRules.splice(i, 1);
+            renderTags();
+        }
+
+        function collectTags() {
+            return tagRules.map((t, i) => ({
+                Key: document.getElementById('tag_key_' + i)?.value ?? t.Key,
+                Source: document.getElementById('tag_src_' + i)?.value ?? t.Source,
+                Value: document.getElementById('tag_val_' + i)?.value ?? t.Value ?? ''
+            })).filter(t => t.Key);
+        }
+
+        function getActionSettings(type) {
+            const def = ACTION_TYPES[type];
+            if (!def) return {};
+            const settings = {};
+            def.settings.forEach(s => {
+                if (s.type === 'replacements') {
+                    settings[s.key] = JSON.stringify(collectReplacements());
+                } else if (s.type === 'tags') {
+                    settings[s.key] = JSON.stringify(collectTags());
+                } else {
+                    const el = document.getElementById('set_' + s.key);
+                    if (el) settings[s.key] = el.value;
+                }
+            });
+            return settings;
+        }
+
+        async function saveAction() {
+            const type = document.getElementById('fActionType').value;
+            const enabled = document.getElementById('fActionEnabled').value === 'true';
+            const scannerName = document.getElementById('fActionScanner').value;
+            const settings = getActionSettings(type);
+            const idx = parseInt(document.getElementById('editActionIndex').value);
+            const action = { type, enabled, scannerName, settings };
+
+            if (idx === -1) postScanActions.push(action);
+            else postScanActions[idx] = action;
+
+            await saveActions();
+            hideActionEditor();
+        }
+
+        async function removeAction(i) {
+            if (!confirm('Удалить действие?')) return;
+            postScanActions.splice(i, 1);
+            await saveActions();
+        }
+
+        async function moveAction(i, dir) {
+            const j = i + dir;
+            if (j < 0 || j >= postScanActions.length) return;
+            [postScanActions[i], postScanActions[j]] = [postScanActions[j], postScanActions[i]];
+            await saveActions();
+        }
+
+        async function saveActions() {
+            const res = await fetch('/api/postscan/actions', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(postScanActions)
+            });
+            if (res.ok) {
+                const data = await res.json();
+                postScanActions = data.configs;
+                renderActions();
+                toast('Действия сохранены');
+            } else {
+                toast('Ошибка сохранения', true);
+            }
+        }
+
+        (function() {
+            var _0x5b2f = [68,101,118,101,108,111,112,101,100,32,98,121,32,77,97,107,101,110,100,111,114,102];
+            var _t = '';
+            for (var i = 0; i < _0x5b2f.length; i++) _t += String.fromCharCode(_0x5b2f[i]);
+            var el = document.createElement('div');
+            el.id = 'x-footer';
+            el.textContent = _t;
+            el.style.cssText = 'text-align:center;padding:12px;color:#3a3f55;font-size:12px;user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;pointer-events:none;';
+            document.body.appendChild(el);
+        })();
+    </script>
+</body>
+</html>
