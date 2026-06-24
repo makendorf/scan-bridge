@@ -13,6 +13,9 @@ obj/
 .idea/
 *.sln.docstates
 
+## AiDex
+.aidex/
+
 ## Logs
 logs/
 *.log
