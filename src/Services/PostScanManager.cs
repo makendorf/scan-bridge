@@ -149,39 +149,41 @@ public class PostScanManager
     {
         var loggerFactory = _services.GetRequiredService<ILoggerFactory>();
 
+        var settings = config.Settings ?? new();
+
         return config.Type switch
         {
             "Log" => new LogAction(loggerFactory.CreateLogger<LogAction>()),
             "ClipboardPaste" => new ClipboardPasteAction(
                 loggerFactory.CreateLogger<ClipboardPasteAction>(),
-                config.Settings),
+                settings),
             "Replacement" => new ReplacementAction(
                 loggerFactory.CreateLogger<ReplacementAction>(),
-                config.Settings),
+                settings),
             "Export" => new ExportAction(
                 loggerFactory.CreateLogger<ExportAction>(),
-                config.Settings),
+                settings),
             "WindowPaste" => new WindowPasteAction(
                 loggerFactory.CreateLogger<WindowPasteAction>(),
-                config.Settings),
+                settings),
             "Telegram" => new TelegramNotificationAction(
                 loggerFactory.CreateLogger<TelegramNotificationAction>(),
-                config.Settings),
+                settings),
             "Email" => new EmailNotificationAction(
                 loggerFactory.CreateLogger<EmailNotificationAction>(),
-                config.Settings),
+                settings),
             "DataEnrichment" => new DataEnrichmentAction(
                 loggerFactory.CreateLogger<DataEnrichmentAction>(),
-                config.Settings),
+                settings),
             "Validation" => new ValidationAction(
                 loggerFactory.CreateLogger<ValidationAction>(),
-                config.Settings),
+                settings),
             "Aggregation" => new AggregationAction(
                 loggerFactory.CreateLogger<AggregationAction>(),
-                config.Settings),
+                settings),
             "DatabaseQuery" => new DatabaseQueryAction(
                 loggerFactory.CreateLogger<DatabaseQueryAction>(),
-                config.Settings),
+                settings),
             _ => null
         };
     }

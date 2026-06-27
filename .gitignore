@@ -24,6 +24,9 @@ logs/
 ## Database
 *.db
 
+## Build artifacts
+publish/
+
 ## OS
 Thumbs.db
 .DS_Store

@@ -8,6 +8,7 @@
     <AssemblyName>ScanBridgeHub</AssemblyName>
     <Product>ScanBridge Hub</Product>
     <Company>ScanBridge</Company>
+    <NoWarn>NU1903</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
