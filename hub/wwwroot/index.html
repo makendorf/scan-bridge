@@ -519,6 +519,12 @@
             <a class="sidebar-link active" data-panel="dashboard" onclick="switchPanel('dashboard')">
                 <i data-lucide="layout-dashboard"></i> Dashboard
             </a>
+            <a class="sidebar-link" data-panel="history" onclick="switchPanel('history')">
+                <i data-lucide="history"></i> История
+            </a>
+            <a class="sidebar-link" data-panel="alerts" onclick="switchPanel('alerts')">
+                <i data-lucide="bell"></i> Алерты
+            </a>
             <div class="sidebar-divider"></div>
             <div class="sidebar-server-label">Серверы</div>
             <div id="sidebarServers"></div>
@@ -650,6 +656,65 @@
             </div>
         </div>
 
+        <!-- ═══ HISTORY ═══ -->
+        <div class="panel" id="panel-history">
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon blue"><i data-lucide="scan-barcode"></i></div>
+                    <div class="kpi-label">Всего сканирований</div>
+                    <div class="kpi-value" id="histTotal">0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon green"><i data-lucide="calendar"></i></div>
+                    <div class="kpi-label">Сегодня</div>
+                    <div class="kpi-value" id="histToday">0</div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <div class="glass-card-header">
+                    <h2><i data-lucide="history"></i> Последние сканирования</h2>
+                    <button class="btn btn-secondary btn-sm" onclick="loadHistory()"><i data-lucide="refresh-cw"></i> Обновить</button>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Время</th><th>Сервер</th><th>Сканер</th><th>Данные</th><th>Формат</th><th>Валидно</th></tr></thead>
+                    <tbody id="historyBody"></tbody>
+                </table>
+                <div id="historyEmpty" class="empty-state hidden"><p>Нет данных</p></div>
+            </div>
+
+            <div class="glass-card">
+                <div class="glass-card-header">
+                    <h2><i data-lucide="bar-chart-2"></i> Топ сканеров</h2>
+                </div>
+                <div id="topScanners"></div>
+            </div>
+        </div>
+
+        <!-- ═══ ALERTS ═══ -->
+        <div class="panel" id="panel-alerts">
+            <div class="glass-card">
+                <div class="glass-card-header">
+                    <h2><i data-lucide="bell"></i> Правила алертов</h2>
+                    <button class="btn btn-primary" onclick="showAddAlert()"><i data-lucide="plus"></i> Добавить</button>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Имя</th><th>Тип</th><th>Статус</th><th>Последний триггер</th><th></th></tr></thead>
+                    <tbody id="alertsBody"></tbody>
+                </table>
+                <div id="alertsEmpty" class="empty-state hidden">
+                    <i data-lucide="bell-off"></i>
+                    <p>Правила алертов не настроены</p>
+                </div>
+            </div>
+
+            <div class="info-banner">
+                <i data-lucide="info"></i>
+                Поддерживаемые каналы: Telegram (нужен BotToken + ChatId), Webhook (нужен URL).
+                Алерты срабатывают при: сервер стал недоступен, сервер вернулся в онлайн.
+            </div>
+        </div>
+
         <!-- ═══ SETTINGS ═══ -->
         <div class="panel" id="panel-settings">
             <div class="glass-card">
@@ -705,6 +770,51 @@
                 <button class="btn btn-primary" onclick="saveInstance()">
                     <i data-lucide="check"></i> Сохранить
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="alertModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Добавить алерт</h2>
+                <button class="btn-icon" onclick="closeModal('alertModal')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>Имя</label>
+                    <input id="fAlertName" placeholder="напр. Telegram уведомление">
+                </div>
+                <div class="form-group">
+                    <label>Канал</label>
+                    <select id="fAlertType" onchange="updateAlertFields()">
+                        <option value="Telegram">Telegram</option>
+                        <option value="Webhook">Webhook</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Включён</label>
+                    <select id="fAlertEnabled">
+                        <option value="true">Да</option>
+                        <option value="false">Нет</option>
+                    </select>
+                </div>
+                <div class="form-group full" id="fAlertTokenGroup">
+                    <label>Bot Token</label>
+                    <input id="fAlertBotToken" placeholder="123456:ABC-DEF...">
+                </div>
+                <div class="form-group full" id="fAlertChatGroup">
+                    <label>Chat ID</label>
+                    <input id="fAlertChatId" placeholder="-1001234567890">
+                </div>
+                <div class="form-group full hidden" id="fAlertUrlGroup">
+                    <label>Webhook URL</label>
+                    <input id="fAlertUrl" placeholder="https://hooks.example.com/alert">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeModal('alertModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="saveAlert()"><i data-lucide="check"></i> Сохранить</button>
             </div>
         </div>
     </div>
@@ -779,6 +889,8 @@
             const panel = document.getElementById('panel-' + name);
             if (panel) panel.classList.add('active');
             if (name === 'settings') loadPollInterval();
+            if (name === 'history') loadHistory();
+            if (name === 'alerts') loadAlerts();
             closeSidebar();
         }
 
@@ -1145,6 +1257,156 @@
             t.textContent = msg;
             document.getElementById('toastContainer').appendChild(t);
             setTimeout(() => t.remove(), 3000);
+        }
+
+        /* ── History ── */
+        async function loadHistory() {
+            try {
+                const [historyRes, statsRes] = await Promise.all([
+                    fetch('/api/history?limit=200'),
+                    fetch('/api/history/stats')
+                ]);
+                const events = await historyRes.json();
+                const stats = await statsRes.json();
+
+                document.getElementById('histTotal').textContent = stats.totalScans;
+                document.getElementById('histToday').textContent = stats.todayScans;
+
+                const tbody = document.getElementById('historyBody');
+                const empty = document.getElementById('historyEmpty');
+                if (!events || events.length === 0) {
+                    tbody.innerHTML = '';
+                    empty.classList.remove('hidden');
+                    document.getElementById('topScanners').innerHTML = '';
+                    return;
+                }
+                empty.classList.add('hidden');
+                tbody.innerHTML = events.map(e => {
+                    const time = new Date(e.timestamp).toLocaleString('ru-RU');
+                    const validBadge = e.isValid
+                        ? '<span class="badge badge-green">OK</span>'
+                        : '<span class="badge badge-red">ERR</span>';
+                    return `<tr>
+                        <td style="font-size:12px;color:var(--color-text-dim)">${time}</td>
+                        <td><span class="badge badge-blue">${esc(e.instanceName)}</span></td>
+                        <td>${esc(e.scannerName || '—')}</td>
+                        <td style="font-family:'Fira Code',monospace;font-size:12px">${esc(e.parsedData || e.rawData || '—')}</td>
+                        <td><span class="badge">${esc(e.format || '—')}</span></td>
+                        <td>${validBadge}</td>
+                    </tr>`;
+                }).join('');
+
+                const topEl = document.getElementById('topScanners');
+                if (stats.topScanners && stats.topScanners.length > 0) {
+                    const maxCount = stats.topScanners[0].count;
+                    topEl.innerHTML = stats.topScanners.map(s => {
+                        const pct = Math.round((s.count / maxCount) * 100);
+                        return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+                            <span style="min-width:120px;font-size:13px;color:var(--color-text-dim)">${esc(s.scanner)}</span>
+                            <div style="flex:1;height:20px;background:var(--color-surface);border-radius:4px;overflow:hidden">
+                                <div style="height:100%;width:${pct}%;background:var(--color-primary);border-radius:4px"></div>
+                            </div>
+                            <span style="font-size:13px;font-weight:600;min-width:50px;text-align:right;font-family:'Fira Code',monospace">${s.count}</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    topEl.innerHTML = '<div class="empty-state"><p>Нет данных</p></div>';
+                }
+                lucide.createIcons();
+            } catch (e) { console.error('Ошибка загрузки истории', e); }
+        }
+
+        /* ── Alerts ── */
+        let alertRules = [];
+
+        async function loadAlerts() {
+            try {
+                const res = await fetch('/api/alerts');
+                alertRules = await res.json();
+                renderAlerts();
+            } catch (e) { console.error('Ошибка загрузки алертов', e); }
+        }
+
+        function renderAlerts() {
+            const tbody = document.getElementById('alertsBody');
+            const empty = document.getElementById('alertsEmpty');
+            if (!alertRules || alertRules.length === 0) {
+                tbody.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+            tbody.innerHTML = alertRules.map(a => {
+                const statusBadge = a.enabled
+                    ? '<span class="badge badge-green">Вкл</span>'
+                    : '<span class="badge">Выкл</span>';
+                const lastTriggered = a.lastTriggered
+                    ? new Date(a.lastTriggered).toLocaleString('ru-RU')
+                    : '—';
+                return `<tr>
+                    <td><strong>${esc(a.name)}</strong></td>
+                    <td><span class="badge badge-blue">${esc(a.type)}</span></td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size:12px;color:var(--color-text-dim)">${lastTriggered}</td>
+                    <td class="actions-cell">
+                        <button class="btn-icon danger" onclick="deleteAlert(${a.id})" title="Удалить"><i data-lucide="trash-2"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function showAddAlert() {
+            document.getElementById('fAlertName').value = '';
+            document.getElementById('fAlertType').value = 'Telegram';
+            document.getElementById('fAlertEnabled').value = 'true';
+            document.getElementById('fAlertBotToken').value = '';
+            document.getElementById('fAlertChatId').value = '';
+            document.getElementById('fAlertUrl').value = '';
+            updateAlertFields();
+            openModal('alertModal');
+        }
+
+        function updateAlertFields() {
+            const type = document.getElementById('fAlertType').value;
+            document.getElementById('fAlertTokenGroup').classList.toggle('hidden', type !== 'Telegram');
+            document.getElementById('fAlertChatGroup').classList.toggle('hidden', type !== 'Telegram');
+            document.getElementById('fAlertUrlGroup').classList.toggle('hidden', type !== 'Webhook');
+        }
+
+        async function saveAlert() {
+            const name = document.getElementById('fAlertName').value.trim();
+            const type = document.getElementById('fAlertType').value;
+            const enabled = document.getElementById('fAlertEnabled').value === 'true';
+            if (!name) { toast('Имя обязательно', true); return; }
+
+            const settings = {};
+            if (type === 'Telegram') {
+                settings.BotToken = document.getElementById('fAlertBotToken').value.trim();
+                settings.ChatId = document.getElementById('fAlertChatId').value.trim();
+                if (!settings.BotToken || !settings.ChatId) { toast('BotToken и ChatId обязательны', true); return; }
+            } else {
+                settings.Url = document.getElementById('fAlertUrl').value.trim();
+                if (!settings.Url) { toast('URL обязателен', true); return; }
+            }
+
+            const res = await fetch('/api/alerts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, type, enabled, settings })
+            });
+            if (res.ok) {
+                closeModal('alertModal');
+                toast('Алерт создан');
+                loadAlerts();
+            } else { toast('Ошибка создания', true); }
+        }
+
+        async function deleteAlert(id) {
+            if (!confirm('Удалить правило алерта?')) return;
+            const res = await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
+            if (res.ok) { toast('Алерт удалён'); loadAlerts(); }
+            else { toast('Ошибка удаления', true); }
         }
 
         function getTheme() { return localStorage.getItem('scanbridge-hub-theme') || 'dark'; }
