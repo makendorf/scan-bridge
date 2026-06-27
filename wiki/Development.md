@@ -9,9 +9,11 @@
 ## Структура решения
 
 ```
-xTrack-Mercury-Skan.slnx
-├── src/ScanBridge.csproj        # Основной проект
-└── tests/ScanBridge.Tests.csproj # Тесты
+ScanBridge.slnx
+├── src/ScanBridge.csproj          # Основной проект
+├── tests/ScanBridge.Tests.csproj  # Тесты
+├── hub/ScanBridgeHub.csproj       # Hub-проект
+└── hub.Tests/                     # Тесты Hub
 ```
 
 ## Запуск
@@ -21,7 +23,7 @@ cd src
 dotnet run
 ```
 
-Веб-интерфейс: `http://localhost:5000`
+Веб-интерфейс: `http://localhost:5000` (порт настраивается в `appsettings.json`)
 
 ## Зависимости
 
@@ -41,14 +43,39 @@ dotnet run
 // Singleton-сервисы
 builder.Services.AddSingleton<LogCollector>();
 builder.Services.AddSingleton<IBarcodeParser, SimpleBarcodeParser>();
+builder.Services.AddSingleton<IPostScanActionFactory, PostScanActionFactory>();
 builder.Services.AddSingleton<PostScanManager>();
 builder.Services.AddSingleton<ScanProcessorService>();
 builder.Services.AddSingleton<ScannerManager>();
 
-// DbContext
+// Фабрика SerialPortService (для тестирования и гибкости)
+builder.Services.AddSingleton<Func<SerialPortConfig, ReconnectConfig?, SerialPortService>>(sp =>
+{
+    return (config, reconnect) => new SerialPortService(
+        sp.GetRequiredService<ILogger<SerialPortService>>(),
+        config,
+        sp.GetRequiredService<IBarcodeParser>(),
+        sp.GetRequiredService<ScanProcessorService>(),
+        reconnect);
+});
+
+// DbContext (путь настраивается)
 builder.Services.AddDbContext<AppDbContext>(o =>
-    o.UseSqlite("Data Source=scanbridge.db"));
+    o.UseSqlite($"Data Source={builder.Configuration.GetValue(\"Database\", \"scanbridge.db\")}"));
 ```
+
+## API Endpoints
+
+API-эндпоинты вынесены из `Program.cs` в отдельные extension-методы:
+
+| Файл | Эндпоинты |
+|------|-----------|
+| `src/Api/ScannerEndpoints.cs` | `GET/POST/PUT/DELETE /api/scanners`, `POST /api/scanners/{name}/restart` |
+| `src/Api/LogEndpoints.cs` | `GET/DELETE /api/logs` |
+| `src/Api/PortEndpoints.cs` | `GET /api/ports` |
+| `src/Api/PostScanEndpoints.cs` | `GET/PUT /api/postscan/groups` |
+| `src/Api/SettingsEndpoints.cs` | `GET/PUT /api/settings/reconnect`, `GET/PUT /api/settings/reconnect/config` |
+| `src/Api/DbHelpers.cs` | `ReadScanners()`, `ReadReconnectConfig()`, `GetReconnectMode()`, `SetSetting()` |
 
 ## Добавление нового пост-скан действия
 
@@ -69,13 +96,13 @@ public class MyAction : IPostScanAction
 }
 ```
 
-2. Зарегистрируйте в `PostScanManager.CreateAction()`:
+2. Зарегистрируйте в `PostScanActionFactory.Create()`:
 
 ```csharp
 return config.Type switch
 {
     // ... существующие
-    "MyAction" => new MyAction(logger, config.Settings),
+    "MyAction" => new MyAction(_loggerFactory.CreateLogger<MyAction>(), settings),
     _ => null
 };
 ```
@@ -122,4 +149,20 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .WriteTo.Sink(new CollectorSink(() => app.Services.GetRequiredService<LogCollector>()))
     .CreateLogger();
+```
+
+## Конфигурация
+
+Порт и путь к БД настраиваются через `appsettings.json`:
+
+```json
+{
+  "Port": 5000,
+  "Database": "scanbridge.db",
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information"
+    }
+  }
+}
 ```

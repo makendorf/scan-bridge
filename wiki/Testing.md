@@ -21,7 +21,12 @@ tests/
 │   ├── SaveToFileActionTests.cs
 │   ├── LogCollectorTests.cs
 │   └── CollectorSinkTests.cs
-└── ScanBridge.Tests.csproj
+├── ScanBridge.Tests.csproj
+hub.Tests/
+├── HubDbContextTests.cs
+├── InstancePollerTests.cs
+├── ScanTrackerTests.cs
+└── ScanBridgeHub.Tests.csproj
 ```
 
 ## Стек тестирования
@@ -51,16 +56,22 @@ tests/
 ### Сервисы
 
 - `ScanProcessorService` — вызов пост-скан действий
-- `ScannerManager` — запуск/остановка сканеров, конфликты портов
+- `ScannerManager` — запуск/остановка сканеров, конфликты портов (использует `StubSerialPortService` для тестов)
 - `LogCollector` — запись логов в БД
 - `CollectorSink` — интеграция с Serilog
 
 ### Пост-скан действия
 
-- `SaveToFileAction` — экспорт в JSON/XML
+- `ExportAction` (SaveToFile) — экспорт в JSON/XML/FTP/SFTP/HTTP
 - `ReplacementAction` — замена символов
 - `LogAction` — логирование
 - `ClipboardPasteAction` — вставка в окно
+
+### Hub
+
+- `HubDbContextTests` — тесты БД hub
+- `InstancePollerTests` — тесты опроса экземпляров
+- `ScanTrackerTests` — тесты трекера сканирований
 
 ## Генерация отчёта покрытия
 

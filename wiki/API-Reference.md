@@ -20,7 +20,13 @@
     "stopBits": "One",
     "handshake": "RequestToSend",
     "readTimeout": 5000,
-    "writeTimeout": 5000
+    "writeTimeout": 5000,
+    "controlCharMode": "0",
+    "reconnect": {
+      "delayMs": 1000,
+      "maxRetries": 10,
+      "continuous": false
+    }
   }
 ]
 ```
@@ -38,6 +44,18 @@
     "running": true
   }
 ]
+```
+
+### GET /api/scanners/lastscan
+
+Получить время и имя сканера последнего сканирования.
+
+**Ответ:**
+```json
+{
+  "time": "2026-06-24T10:30:00Z",
+  "scannerName": "Main"
+}
 ```
 
 ### POST /api/scanners
@@ -85,50 +103,62 @@
 
 **Параметры:** `name` — имя сканера (URL-encoded)
 
-## Пост-скан действия
+## Пост-скан действия (группы)
 
-### GET /api/postscan/actions
+### GET /api/postscan/groups
 
-Получить список действий и список активных.
+Получить все группы с действиями и привязками к сканерам.
 
 **Ответ:**
 ```json
 {
-  "configs": [
+  "groups": [
     {
       "id": 1,
-      "type": "Log",
+      "name": "Основная группа",
       "enabled": true,
-      "scannerName": "Main",
-      "settings": {}
+      "scannerNames": ["Main"],
+      "actions": [
+        {
+          "id": 1,
+          "type": "Log",
+          "enabled": true,
+          "settings": {}
+        }
+      ]
     }
   ],
   "enabled": ["Log", "ClipboardPaste"]
 }
 ```
 
-### PUT /api/postscan/actions
+### PUT /api/postscan/groups
 
-Обновить все действия (полная замена).
+Полная перезапись всех групп.
 
 **Тело запроса:**
 ```json
 [
   {
-    "type": "Log",
+    "name": "Основная группа",
     "enabled": true,
-    "scannerName": "",
-    "settings": {}
-  },
-  {
-    "type": "Export",
-    "enabled": true,
-    "scannerName": "Main",
-    "settings": {
-      "Destination": "folder",
-      "FolderPath": "C:\\Output",
-      "Format": "json"
-    }
+    "scannerNames": ["Main"],
+    "actions": [
+      {
+        "type": "Log",
+        "enabled": true,
+        "settings": {}
+      },
+      {
+        "type": "Export",
+        "enabled": true,
+        "settings": {
+          "Destination": "folder",
+          "FolderPath": "C:\\Output",
+          "Format": "json"
+        }
+      }
+    ]
   }
 ]
 ```
@@ -168,7 +198,7 @@
 ["COM1", "COM2", "COM3"]
 ```
 
-## Настройки
+## Настройки переподключения
 
 ### GET /api/settings/reconnect
 
@@ -189,5 +219,31 @@
 ```json
 {
   "mode": "all"
+}
+```
+
+### GET /api/settings/reconnect/config
+
+Получить параметры переподключения.
+
+**Ответ:**
+```json
+{
+  "delayMs": 1000,
+  "maxRetries": 10,
+  "continuous": false
+}
+```
+
+### PUT /api/settings/reconnect/config
+
+Обновить параметры переподключения. Все сканеры перезапускаются для применения.
+
+**Тело запроса:**
+```json
+{
+  "delayMs": 2000,
+  "maxRetries": 20,
+  "continuous": true
 }
 ```

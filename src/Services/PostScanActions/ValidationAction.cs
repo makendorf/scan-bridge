@@ -26,10 +26,13 @@ public class ValidationAction : IPostScanAction
     private readonly bool _requireBarcode;
     private readonly HashSet<string> _allowedFormats = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _allowedContentTypes = new(StringComparer.OrdinalIgnoreCase);
+    private bool _loaded;
+    private Dictionary<string, string> _settings;
 
     public ValidationAction(ILogger<ValidationAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
+        _settings = settings;
 
         _validationType = (settings.TryGetValue("ValidationType", out var vt) ? vt : "regex").ToLowerInvariant();
         _onFailure = (settings.TryGetValue("OnFailure", out var of) ? of : "skip").ToLowerInvariant();
@@ -73,10 +76,6 @@ public class ValidationAction : IPostScanAction
             _maxLength = settings.TryGetValue("MaxLength", out var maxLenStr)
                 && int.TryParse(maxLenStr, out var maxLen) ? maxLen : 9999;
         }
-        else if (_validationType == "dictionary")
-        {
-            LoadDictionary(settings);
-        }
         else if (_validationType == "range")
         {
             _minValue = settings.TryGetValue("MinValue", out var minStr)
@@ -90,6 +89,12 @@ public class ValidationAction : IPostScanAction
 
     public async Task ExecuteAsync(ScanResult scan, CancellationToken ct)
     {
+        if (_validationType == "dictionary" && !_loaded)
+        {
+            await LoadDictionaryAsync(_settings).ConfigureAwait(false);
+            _loaded = true;
+        }
+
         var valid = _validationType switch
         {
             "format" => ValidateFormat(scan),
@@ -157,7 +162,7 @@ public class ValidationAction : IPostScanAction
         return value >= _minValue && value <= _maxValue;
     }
 
-    private void LoadDictionary(Dictionary<string, string> settings)
+    private async Task LoadDictionaryAsync(Dictionary<string, string> settings)
     {
         var lines = new List<string>();
 
@@ -166,7 +171,7 @@ public class ValidationAction : IPostScanAction
             try
             {
                 if (File.Exists(filePath))
-                    lines.AddRange(File.ReadAllLines(filePath));
+                    lines.AddRange(await File.ReadAllLinesAsync(filePath).ConfigureAwait(false));
             }
             catch (Exception ex)
             {
@@ -179,7 +184,7 @@ public class ValidationAction : IPostScanAction
             try
             {
                 using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                var content = client.GetStringAsync(url).GetAwaiter().GetResult();
+                var content = await client.GetStringAsync(url).ConfigureAwait(false);
                 lines.AddRange(content.Split('\n', StringSplitOptions.RemoveEmptyEntries));
             }
             catch (Exception ex)

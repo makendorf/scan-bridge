@@ -4,33 +4,30 @@ using ScanBridge.Data.Entities;
 
 namespace ScanBridge.Services;
 
-/// <summary>
-/// Коллектор логов — сохраняет записи логов в базу данных SQLite.
-/// Использует очередь для буферизации при ошибках записи.
-/// Потокобезопасен через объект блокировки.
-/// </summary>
 public class LogCollector
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly Queue<LogRecord> _pending = new();
     private readonly object _lock = new();
+    private AppDbContext? _db;
 
-    /// <summary>
-    /// Создаёт экземпляр коллектора логов.
-    /// </summary>
-    /// <param name="serviceProvider">Провайдер зависимостей для создания scope БД.</param>
     public LogCollector(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
     }
 
-    /// <summary>
-    /// Добавляет запись лога в базу данных. При ошибке записи — буферизует в очереди.
-    /// При следующей успешной попытке буфер сбрасывается в БД.
-    /// </summary>
-    /// <param name="level">Уровень логирования: INF, WRN, ERR, DBG, FTL, VRB.</param>
-    /// <param name="message">Текст сообщения.</param>
-    /// <param name="exception">Текст исключения (опционально).</param>
+    private AppDbContext GetDbContext()
+    {
+        if (_db != null) return _db;
+        lock (_lock)
+        {
+            if (_db != null) return _db;
+            var scope = _serviceProvider.CreateScope();
+            _db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return _db;
+        }
+    }
+
     public void Add(string level, string message, string? exception = null)
     {
         var record = new LogRecord
@@ -43,8 +40,7 @@ public class LogCollector
 
         try
         {
-            using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var db = GetDbContext();
             LogRecord[] pending;
             lock (_lock)
             {
@@ -63,17 +59,13 @@ public class LogCollector
         }
     }
 
-    /// <summary>
-    /// Очищает все записи логов из базы данных и буфера.
-    /// </summary>
     public void Clear()
     {
         lock (_lock) { _pending.Clear(); }
 
         try
         {
-            using var scope = _serviceProvider.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var db = GetDbContext();
             db.Logs.ExecuteDelete();
             db.SaveChanges();
         }

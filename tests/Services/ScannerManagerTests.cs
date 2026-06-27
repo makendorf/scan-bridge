@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ScanBridge.Models;
@@ -10,31 +9,32 @@ namespace ScanBridge.Tests.Services;
 public class ScannerManagerTests : IDisposable
 {
     private readonly Mock<ILogger<ScannerManager>> _loggerMock = new();
-    private readonly Mock<ILogger<SerialPortService>> _portLoggerMock = new();
-    private readonly Mock<ILogger<ScanProcessorService>> _processorLoggerMock = new();
-    private readonly Mock<IBarcodeParser> _parserMock = new();
-    private readonly Mock<PostScanManager> _postScanMock;
-    private readonly Mock<ScanProcessorService> _processorMock;
-    private readonly ServiceCollection _services;
     private readonly ScannerManager _manager;
 
     public ScannerManagerTests()
     {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        var provider = services.BuildServiceProvider();
-        _postScanMock = new Mock<PostScanManager>(
-            provider,
-            new Mock<ILogger<PostScanManager>>().Object);
-        _processorMock = new Mock<ScanProcessorService>(_postScanMock.Object, new ScanTracker(), _processorLoggerMock.Object);
-        _services = new ServiceCollection();
-        _services.AddSingleton(_portLoggerMock.Object);
-        _services.AddSingleton(_processorMock.Object);
-        _manager = new ScannerManager(
-            _services.BuildServiceProvider(),
-            _loggerMock.Object,
-            _parserMock.Object,
-            _processorMock.Object);
+        Func<SerialPortConfig, ReconnectConfig?, SerialPortService> factory = (_, _) =>
+            new StubSerialPortService();
+
+        _manager = new ScannerManager(factory, _loggerMock.Object);
+    }
+
+    private class StubSerialPortService : SerialPortService
+    {
+        public StubSerialPortService()
+            : base(
+                new Mock<ILogger<SerialPortService>>().Object,
+                new SerialPortConfig(),
+                new Mock<IBarcodeParser>().Object,
+                new Mock<ScanProcessorService>(
+                    new Mock<PostScanManager>(
+                        new Mock<IPostScanActionFactory>().Object,
+                        new Mock<ILogger<PostScanManager>>().Object).Object,
+                    new ScanTracker(),
+                    new Mock<ILogger<ScanProcessorService>>().Object).Object)
+        { }
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.CompletedTask;
     }
 
     public void Dispose() => _manager.Dispose();

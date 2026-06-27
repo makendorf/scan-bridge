@@ -9,11 +9,13 @@
 ## Возможности
 
 - **Множество сканеров** — параллельная работа с неограниченным количеством сканеров
+- **Группы действий** — пост-скан действия организованы в группы с привязкой к сканерам
 - **Автопереподключение** — автоматическое восстановление при потере связи с COM-портом
 - **Определение формата** — распознавание UUID, EAN-8/13, UPC-A, GTIN-14, Code128, GS1-128
 - **QR-контент** — определение типа содержимого QR-кодов (URL, JSON, WiFi, vCard)
-- **Гибкие действия** — настраиваемый пайплайн обработки после сканирования
+- **Гибкие действия** — настраиваемый пайплайн: Log, Replacement, ClipboardPaste, WindowPaste, Export, Validation, DataEnrichment, Aggregation, DatabaseQuery, Telegram, Email
 - **Веб-интерфейс** — управление сканерами и действиями через браузер
+- **Hub** — центральный хаб для мониторинга нескольких экземпляров ScanBridge
 
 ## Стек технологий
 
@@ -29,67 +31,55 @@
 ```
 ScanBridge/
 ├── src/
-│   ├── Data/                    # EF Core DbContext
+│   ├── Api/                       # Extension-методы для API endpoints
+│   ├── Data/                      # EF Core DbContext
 │   │   ├── AppDbContext.cs
-│   │   └── Entities/            # Сущности БД
-│   │       ├── AppSetting.cs
-│   │       ├── LogRecord.cs
-│   │       ├── PostScanAction.cs
-│   │       └── ScannerConfig.cs
-│   ├── Models/                  # Модели данных
-│   │   ├── PostScanActionConfig.cs
-│   │   ├── ScanResult.cs
-│   │   └── SerialPortConfig.cs
-│   ├── Parsers/                 # Парсеры штрихкодов
-│   │   ├── IBarcodeParser.cs
-│   │   ├── QRContentDetector.cs
-│   │   └── SimpleBarcodeParser.cs
-│   ├── Services/                # Бизнес-логика
-│   │   ├── CollectorSink.cs
-│   │   ├── IPostScanAction.cs
-│   │   ├── LogCollector.cs
-│   │   ├── PostScanManager.cs
-│   │   ├── ScannerManager.cs
-│   │   ├── ScanProcessorService.cs
-│   │   ├── SerialPortService.cs
-│   │   └── PostScanActions/     # Типы действий
-│   │       ├── ClipboardPasteAction.cs
-│   │       ├── ExportAction.cs
-│   │       ├── LogAction.cs
-│   │       └── ReplacementAction.cs
-│   ├── wwwroot/                 # Веб-интерфейс
-│   │   └── index.html
-│   └── Program.cs               # Точка входа
-├── tests/                       # Тесты (xUnit + Moq)
-│   ├── Parsers/
-│   └── Services/
-├── ScanBridge.slnx
-└── README.md
+│   │   └── Entities/              # Сущности БД
+│   ├── Models/                    # Модели данных
+│   ├── Parsers/                   # Парсеры штрихкодов
+│   ├── Services/                  # Бизнес-логика
+│   │   ├── PostScanActions/       # Типы действий
+│   │   ├── IPostScanActionFactory.cs
+│   │   ├── PostScanActionFactory.cs
+│   │   └── ...
+│   ├── Utils/                     # Утилиты (Win32Clipboard, ControlCharDisplay)
+│   ├── wwwroot/                   # Веб-интерфейс
+│   └── Program.cs                 # Точка входа
+├── hub/                           # Hub-проект (центральный хаб)
+├── hub.Tests/                     # Тесты Hub
+├── tests/                         # Тесты (xUnit + Moq)
+├── wiki/                          # Документация
+└── ScanBridge.slnx
 ```
 
 ## Типы действий после сканирования
 
 | Действие | Описание |
 |----------|----------|
-| **Логирование** | Запись данных сканирования в БД |
-| **Замена символов** | Подстановка подстрок в данных (Найти → Заменить, режим: Везде / В начале / В конце) |
-| **Вставка в окно** | Вставка данных в активное окно через Ctrl+V (WinAPI) |
-| **Экспорт** | Экспорт в JSON/XML с настраиваемыми тегами |
-
-### Назначения экспорта
-
-- **Локальная папка** — сохранение файлов на диск (включая UNC-пути)
-- **FTP** — загрузка на FTP-сервер (активный/пассивный режим)
-- **SFTP** — загрузка на SSH-сервер
-- **HTTP POST** — отправка POST-запроса на API (с заголовками и Content-Type)
+| **Log** | Запись данных сканирования в БД |
+| **Replacement** | Подстановка подстрок в данных (Найти → Заменить, режим: Везде / В начале / В конце) |
+| **ClipboardPaste** | Вставка данных в активное окно через Ctrl+V (WinAPI) |
+| **WindowPaste** | Вставка данных в выбранное окно по заголовку (WinAPI) |
+| **Export** | Экспорт в JSON/XML с настраиваемыми тегами (локальная папка, FTP, SFTP, HTTP POST) |
+| **Validation** | Валидация данных (regex, словарь, числовой диапазон, формат) |
+| **DataEnrichment** | Обогащение данных HTTP-запросом |
+| **Aggregation** | Агрегация сканирований с периодическим выводом |
+| **DatabaseQuery** | Запрос к внешней БД |
+| **Telegram** | Уведомления в Telegram |
+| **Email** | Уведомления по email |
 
 ## Конфигурация
 
-Настройки хранятся в SQLite базе данных `scanbridge.db`. Управление через веб-интерфейс:
+Настройки хранятся в SQLite базе данных. Порт и путь к БД настраиваются через `appsettings.json`:
 
-- **Сканеры** — добавление, редактирование, перезапуск сканеров
-- **Действия** — настройка пайплайна обработки для каждого сканера
-- **Логи** — просмотр записей с фильтрацией по уровню
+```json
+{
+  "Port": 5000,
+  "Database": "scanbridge.db"
+}
+```
+
+Управление — через веб-интерфейс: добавление/редактирование сканеров, настройка групп действий, просмотр логов.
 
 ## Запуск
 
@@ -100,30 +90,17 @@ dotnet run
 
 Веб-интерфейс: `http://localhost:5000`
 
-## Конфигурация COM-порта
-
-Пример настройки сканера через веб-интерфейс:
-
-| Параметр | Значение |
-|----------|----------|
-| Имя | Основной |
-| Порт | COM2 |
-| Скорость | 9600 |
-| Биты данных | 8 |
-| Чётность | None |
-| Стоп-биты | One |
-| Управление потоком | RequestToSend |
-
 ## Архитектура
 
 ```
 COM-порт → SerialPortService → SimpleBarcodeParser → ScanProcessorService
-    → PostScanManager → [Replacement → ClipboardPaste → Export]
+    → PostScanManager → [PostScanActionFactory] → [actions...]
 ```
 
 - Каждый сканер работает в отдельном `BackgroundService`
 - Парсер определяет формат штрихкода и QR-контент
-- Действия выполняются последовательно, порядок настраивается
+- Действия организованы в группы, группы выполняются параллельно
+- Действия внутри группы выполняются последовательно
 - Изменения данных в одном действии доступны следующим
 
 ## Тестирование
@@ -132,7 +109,7 @@ COM-порт → SerialPortService → SimpleBarcodeParser → ScanProcessorServ
 dotnet test
 ```
 
-Проект содержит 120 тестов: парсеры, сервисы, пост-скан действия.
+Проект содержит 192 теста: парсеры, сервисы, пост-скан действия, hub.
 
 ## Лицензия
 

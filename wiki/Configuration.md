@@ -4,6 +4,26 @@
 
 Все настройки хранятся в SQLite базе данных `scanbridge.db`. Управление — через веб-интерфейс или API.
 
+Путь к БД настраивается через `appsettings.json`:
+
+```json
+{
+  "Database": "scanbridge.db"
+}
+```
+
+## Сетевые настройки
+
+Порт сервера настраивается через `appsettings.json`:
+
+```json
+{
+  "Port": 5000
+}
+```
+
+По умолчанию сервер слушает на `http://0.0.0.0:5000`.
+
 ## Режим переподключения
 
 Параметр `ReconnectMode` определяет поведение при сохранении изменений сканера:
@@ -12,6 +32,14 @@
 |-------|----------|
 | `single` | Переподключается только изменённый сканер (по умолчанию) |
 | `all` | Переподключаются все сканеры |
+
+## Параметры переподключения
+
+| Параметр | Диапазон | По умолчанию |
+|----------|----------|--------------|
+| `ReconnectDelayMs` | 100–60000 мс | 1000 |
+| `ReconnectMaxRetries` | 1–10000 | 10 |
+| `ReconnectContinuous` | true/false | false |
 
 ## Импорт из appsettings.json
 
@@ -30,7 +58,12 @@
       "StopBits": "One",
       "Handshake": "RequestToSend",
       "ReadTimeout": 5000,
-      "WriteTimeout": 5000
+      "WriteTimeout": 5000,
+      "Reconnect": {
+        "DelayMs": 1000,
+        "MaxRetries": 10,
+        "Continuous": false
+      }
     }
   ]
 }
@@ -53,14 +86,6 @@
 ```
 
 Уровни логирования: `Verbose`, `Debug`, `Information`, `Warning`, `Error`, `Fatal`
-
-## Сетевые настройки
-
-По умолчанию сервер слушает на `http://0.0.0.0:5000`. Для изменения — редактируйте `Program.cs`:
-
-```csharp
-builder.WebHost.UseUrls("http://0.0.0.0:5000");
-```
 
 ## Windows Service
 

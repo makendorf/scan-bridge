@@ -13,30 +13,22 @@ namespace ScanBridge.Services;
 /// </summary>
 public class ScannerManager : IDisposable
 {
-    private readonly IServiceProvider _services;
+    private readonly Func<SerialPortConfig, ReconnectConfig?, SerialPortService> _serviceFactory;
     private readonly ILogger<ScannerManager> _logger;
-    private readonly IBarcodeParser _parser;
-    private readonly ScanProcessorService _processor;
     private readonly Dictionary<string, ScannerInstance> _instances = new();
     private readonly object _lock = new();
 
     /// <summary>
     /// Создаёт экземпляр менеджера сканеров.
     /// </summary>
-    /// <param name="services">Провайдер зависимостей для создания сервисов портов.</param>
+    /// <param name="serviceFactory">Фабрика для создания экземпляров SerialPortService.</param>
     /// <param name="logger">Логгер.</param>
-    /// <param name="parser">Парсер штрихкодов.</param>
-    /// <param name="processor">Сервис обработки результатов сканирования.</param>
     public ScannerManager(
-        IServiceProvider services,
-        ILogger<ScannerManager> logger,
-        IBarcodeParser parser,
-        ScanProcessorService processor)
+        Func<SerialPortConfig, ReconnectConfig?, SerialPortService> serviceFactory,
+        ILogger<ScannerManager> logger)
     {
-        _services = services;
+        _serviceFactory = serviceFactory;
         _logger = logger;
-        _parser = parser;
-        _processor = processor;
     }
 
     /// <summary>
@@ -56,29 +48,41 @@ public class ScannerManager : IDisposable
     /// <returns>Имя конфликтующего сканера или null, если конфликтов нет.</returns>
     public string? StartScanner(SerialPortConfig config)
     {
+        return StartScannerAsync(config).GetAwaiter().GetResult();
+    }
+
+    public async Task<string?> StartScannerAsync(SerialPortConfig config)
+    {
+        List<ScannerInstance> toStop;
+        string? conflict;
         lock (_lock)
         {
-            var conflict = FindByPort(config.PortName, config.Name);
+            toStop = new List<ScannerInstance>();
+            conflict = FindByPort(config.PortName, config.Name);
             if (conflict != null)
             {
                 _logger.LogWarning("[{Scanner}] Порт {Port} используется сканером '{Conflict}', останавливаем его",
                     config.Name, config.PortName, conflict);
-                StopScannerInternal(conflict);
+                CollectInstanceToStop(conflict, toStop);
+                _instances.Remove(conflict);
             }
 
-            StopScannerInternal(config.Name);
+            CollectInstanceToStop(config.Name, toStop);
+            _instances.Remove(config.Name);
 
             var cts = new CancellationTokenSource();
-            var service = new SerialPortService(
-                _services.GetRequiredService<ILogger<SerialPortService>>(),
-                config, _parser, _processor, config.Reconnect);
+            var service = _serviceFactory(config, config.Reconnect);
 
             var task = Task.Run(() => service.StartAsync(cts.Token));
             _instances[config.Name] = new ScannerInstance(config, cts, service, task);
 
             _logger.LogInformation("[{Scanner}] Запущен на порту {Port}", config.Name, config.PortName);
-            return conflict;
         }
+
+        foreach (var instance in toStop)
+            await StopInstanceAsync(instance).ConfigureAwait(false);
+
+        return conflict;
     }
 
     /// <summary>
@@ -87,44 +91,50 @@ public class ScannerManager : IDisposable
     /// <param name="name">Имя сканера.</param>
     public void StopScanner(string name)
     {
-        lock (_lock)
-        {
-            StopScannerInternal(name);
-        }
+        StopScannerAsync(name).GetAwaiter().GetResult();
     }
 
-    /// <summary>
-    /// Внутренний метод остановки сканера (без блокировки).
-    /// Отменяет токен, останавливает сервис, освобождает ресурсы.
-    /// </summary>
-    /// <param name="name">Имя сканера.</param>
-    private void StopScannerInternal(string name)
+    public async Task StopScannerAsync(string name)
     {
-        if (!_instances.TryGetValue(name, out var instance)) return;
+        ScannerInstance? instance;
+        lock (_lock)
+        {
+            if (!_instances.Remove(name, out instance!))
+                return;
+        }
+        await StopInstanceAsync(instance).ConfigureAwait(false);
+    }
 
+    private void CollectInstanceToStop(string name, List<ScannerInstance> list)
+    {
+        if (_instances.TryGetValue(name, out var instance))
+            list.Add(instance);
+    }
+
+    private async Task StopInstanceAsync(ScannerInstance instance)
+    {
+        var name = instance.Config.Name;
         _logger.LogInformation("[{Scanner}] Остановка...", name);
 
         instance.Cts.Cancel();
 
-        try { instance.Service.StopAsync(CancellationToken.None).GetAwaiter().GetResult(); }
+        try { await instance.Service.StopAsync(CancellationToken.None).ConfigureAwait(false); }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _logger.LogDebug(ex, "[{Scanner}] Ошибка при остановке сервиса", name); }
 
         try
         {
             if (!instance.Task.IsCompleted)
-                instance.Task.Wait(TimeSpan.FromSeconds(3));
+                await instance.Task.WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
         }
-        catch (AggregateException) { }
         catch (OperationCanceledException) { }
+        catch (TimeoutException) { }
 
         try { instance.Service.Dispose(); }
         catch (Exception ex) { _logger.LogDebug(ex, "[{Scanner}] Ошибка при Dispose сервиса", name); }
 
         try { instance.Cts.Dispose(); }
         catch (Exception ex) { _logger.LogDebug(ex, "[{Scanner}] Ошибка при Dispose CTS", name); }
-
-        _instances.Remove(name);
 
         _logger.LogInformation("[{Scanner}] Остановлен", name);
     }
@@ -159,36 +169,44 @@ public class ScannerManager : IDisposable
         }
     }
 
-    /// <summary>
-    /// Останавливает все запущенные сканеры.
-    /// </summary>
     public void StopAll()
     {
-        lock (_lock)
-        {
-            foreach (var name in _instances.Keys.ToList())
-                StopScannerInternal(name);
-        }
+        StopAllAsync().GetAwaiter().GetResult();
     }
 
-    /// <summary>
-    /// Перезапускает все сканеры: останавливает текущие и запускает новые.
-    /// </summary>
-    /// <param name="scanners">Список конфигураций для запуска.</param>
+    public async Task StopAllAsync()
+    {
+        List<ScannerInstance> toStop;
+        lock (_lock)
+        {
+            toStop = new List<ScannerInstance>(_instances.Values);
+            _instances.Clear();
+        }
+
+        foreach (var instance in toStop)
+            await StopInstanceAsync(instance).ConfigureAwait(false);
+    }
+
     public void RestartAll(List<SerialPortConfig> scanners)
     {
-        StopAll();
+        RestartAllAsync(scanners).GetAwaiter().GetResult();
+    }
+
+    public async Task RestartAllAsync(List<SerialPortConfig> scanners)
+    {
+        await StopAllAsync().ConfigureAwait(false);
         StartAll(scanners);
     }
 
-    /// <summary>
-    /// Перезапускает один сканер.
-    /// </summary>
-    /// <param name="config">Конфигурация сканера.</param>
     public void RestartScanner(SerialPortConfig config)
     {
-        StopScanner(config.Name);
-        StartScanner(config);
+        RestartScannerAsync(config).GetAwaiter().GetResult();
+    }
+
+    public async Task RestartScannerAsync(SerialPortConfig config)
+    {
+        await StopScannerAsync(config.Name).ConfigureAwait(false);
+        await StartScannerAsync(config).ConfigureAwait(false);
     }
 
     /// <summary>

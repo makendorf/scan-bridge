@@ -23,15 +23,6 @@ public class WindowPasteAction : IPostScanAction
     private readonly int _activationDelay;
 
     [DllImport("user32.dll")]
-    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll")]
     private static extern bool BringWindowToTop(IntPtr hWnd);
 
     [DllImport("user32.dll")]
@@ -58,24 +49,7 @@ public class WindowPasteAction : IPostScanAction
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool OpenClipboard(IntPtr hWndNewOwner);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool CloseClipboard();
-
-    [DllImport("user32.dll")]
-    private static extern bool EmptyClipboard();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
-
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-    private const byte VK_CONTROL = 0x11;
-    private const byte VK_V = 0x56;
-    private const uint KEYEVENTF_KEYUP = 0x0002;
-    private const uint CF_UNICODETEXT = 13;
 
     /// <summary>
     /// Создаёт экземпляр действия вставки в выбранное окно.
@@ -123,7 +97,7 @@ public class WindowPasteAction : IPostScanAction
                 return;
             }
 
-            var prevWindow = GetForegroundWindow();
+            var prevWindow = Win32Clipboard.GetForegroundWindow();
 
             ActivateWindow(targetHwnd);
             await Task.Delay(_activationDelay, ct);
@@ -132,14 +106,14 @@ public class WindowPasteAction : IPostScanAction
             if (_appendNewline)
                 text += Environment.NewLine;
 
-            SetClipboardText(text);
+            Win32Clipboard.SetClipboardText(text);
             await Task.Delay(_delayMs, ct);
 
-            SimulatePaste();
+            Win32Clipboard.SimulatePaste();
             await Task.Delay(_delayMs, ct);
 
             if (prevWindow != IntPtr.Zero && prevWindow != targetHwnd)
-                SetForegroundWindow(prevWindow);
+                Win32Clipboard.SetForegroundWindow(prevWindow);
 
             _logger.LogInformation("Вставлено в «{Title}»: {Data}", _windowTitle, ControlCharDisplay.ForDisplay(text.TrimEnd()));
         }
@@ -153,16 +127,12 @@ public class WindowPasteAction : IPostScanAction
         }
     }
 
-    /// <summary>
-    /// Активирует окно через AttachThreadInput + SetForegroundWindow.
-    /// Обходит ограничение Windows, которое не позволяет фоновому процессу менять фокус.
-    /// </summary>
     private static void ActivateWindow(IntPtr hWnd)
     {
-        ShowWindow(hWnd, 9); // SW_RESTORE
+        ShowWindow(hWnd, 9);
         BringWindowToTop(hWnd);
 
-        var foregroundThreadId = GetWindowThreadProcessId(GetForegroundWindow(), out _);
+        var foregroundThreadId = GetWindowThreadProcessId(Win32Clipboard.GetForegroundWindow(), out _);
         var currentThreadId = GetCurrentThreadId();
 
         var attached = false;
@@ -171,7 +141,7 @@ public class WindowPasteAction : IPostScanAction
             attached = AttachThreadInput(currentThreadId, foregroundThreadId, true);
         }
 
-        SetForegroundWindow(hWnd);
+        Win32Clipboard.SetForegroundWindow(hWnd);
         BringWindowToTop(hWnd);
 
         if (attached)
@@ -180,9 +150,6 @@ public class WindowPasteAction : IPostScanAction
         }
     }
 
-    /// <summary>
-    /// Находит окно по частичному совпадению заголовка.
-    /// </summary>
     private static IntPtr FindWindowByTitle(string titlePart)
     {
         IntPtr found = IntPtr.Zero;
@@ -206,57 +173,5 @@ public class WindowPasteAction : IPostScanAction
         }, IntPtr.Zero);
 
         return found;
-    }
-
-    /// <summary>
-    /// Устанавливает текст в буфер обмена Windows через Win32 API.
-    /// </summary>
-    private static void SetClipboardText(string text)
-    {
-        var opened = false;
-        for (var i = 0; i < 10; i++)
-        {
-            if (OpenClipboard(IntPtr.Zero))
-            {
-                opened = true;
-                break;
-            }
-            Thread.Sleep(50);
-        }
-
-        if (!opened)
-            throw new InvalidOperationException("Не удалось открыть буфер обмена после 10 попыток");
-
-        try
-        {
-            EmptyClipboard();
-
-            var hGlobal = Marshal.StringToHGlobalUni(text);
-            if (hGlobal == IntPtr.Zero)
-                throw new OutOfMemoryException("Не удалось выделить память для буфера обмена");
-
-            var result = SetClipboardData(CF_UNICODETEXT, hGlobal);
-
-            if (result == IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(hGlobal);
-                throw new InvalidOperationException("SetClipboardData вернул null");
-            }
-        }
-        finally
-        {
-            CloseClipboard();
-        }
-    }
-
-    /// <summary>
-    /// Эмулирует нажатие Ctrl+V через Win32 API keybd_event.
-    /// </summary>
-    private static void SimulatePaste()
-    {
-        keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-        keybd_event(VK_V, 0, 0, UIntPtr.Zero);
-        keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 }

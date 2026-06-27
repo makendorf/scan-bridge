@@ -11,19 +11,19 @@ namespace ScanBridge.Services;
 /// </summary>
 public class PostScanManager
 {
-    private readonly IServiceProvider _services;
+    private readonly IPostScanActionFactory _factory;
     private readonly ILogger<PostScanManager> _logger;
-    private volatile List<CompiledGroup> _groups = new();
+    private volatile IReadOnlyList<CompiledGroup> _groups = Array.Empty<CompiledGroup>();
     private readonly object _lock = new();
 
     /// <summary>
     /// Создаёт экземпляр менеджера пост-скан действий.
     /// </summary>
-    /// <param name="services">Провайдер зависимостей для создания экшенов.</param>
+    /// <param name="factory">Фабрика для создания экшенов.</param>
     /// <param name="logger">Логгер.</param>
-    public PostScanManager(IServiceProvider services, ILogger<PostScanManager> logger)
+    public PostScanManager(IPostScanActionFactory factory, ILogger<PostScanManager> logger)
     {
-        _services = services;
+        _factory = factory;
         _logger = logger;
     }
 
@@ -67,7 +67,7 @@ public class PostScanManager
 
         lock (_lock)
         {
-            _groups = newGroups;
+            _groups = newGroups.AsReadOnly();
         }
     }
 
@@ -147,45 +147,8 @@ public class PostScanManager
     /// <returns>Экземпляр действия или null, если тип неизвестен.</returns>
     private IPostScanAction? CreateAction(PostScanActionConfig config)
     {
-        var loggerFactory = _services.GetRequiredService<ILoggerFactory>();
-
         var settings = config.Settings ?? new();
-
-        return config.Type switch
-        {
-            "Log" => new LogAction(loggerFactory.CreateLogger<LogAction>()),
-            "ClipboardPaste" => new ClipboardPasteAction(
-                loggerFactory.CreateLogger<ClipboardPasteAction>(),
-                settings),
-            "Replacement" => new ReplacementAction(
-                loggerFactory.CreateLogger<ReplacementAction>(),
-                settings),
-            "Export" => new ExportAction(
-                loggerFactory.CreateLogger<ExportAction>(),
-                settings),
-            "WindowPaste" => new WindowPasteAction(
-                loggerFactory.CreateLogger<WindowPasteAction>(),
-                settings),
-            "Telegram" => new TelegramNotificationAction(
-                loggerFactory.CreateLogger<TelegramNotificationAction>(),
-                settings),
-            "Email" => new EmailNotificationAction(
-                loggerFactory.CreateLogger<EmailNotificationAction>(),
-                settings),
-            "DataEnrichment" => new DataEnrichmentAction(
-                loggerFactory.CreateLogger<DataEnrichmentAction>(),
-                settings),
-            "Validation" => new ValidationAction(
-                loggerFactory.CreateLogger<ValidationAction>(),
-                settings),
-            "Aggregation" => new AggregationAction(
-                loggerFactory.CreateLogger<AggregationAction>(),
-                settings),
-            "DatabaseQuery" => new DatabaseQueryAction(
-                loggerFactory.CreateLogger<DatabaseQueryAction>(),
-                settings),
-            _ => null
-        };
+        return _factory.Create(config.Type, settings);
     }
 
     private record CompiledAction(IPostScanAction Action, PostScanActionConfig Config);
