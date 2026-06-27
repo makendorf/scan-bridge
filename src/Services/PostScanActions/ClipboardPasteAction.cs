@@ -1,10 +1,19 @@
 using System.Runtime.InteropServices;
 using ScanBridge.Models;
+using ScanBridge.Utils;
 
 namespace ScanBridge.Services.PostScanActions;
 
+/// <summary>
+/// Действие вставки результата сканирования в активное окно через буфер обмена.
+/// Использует Win32 API для эмуляции нажатия Ctrl+V.
+/// Работает только на Windows.
+/// </summary>
 public class ClipboardPasteAction : IPostScanAction
 {
+    /// <summary>
+    /// Тип действия.
+    /// </summary>
     public string Type => "ClipboardPaste";
 
     private readonly ILogger<ClipboardPasteAction> _logger;
@@ -37,6 +46,11 @@ public class ClipboardPasteAction : IPostScanAction
     private const uint KEYEVENTF_KEYUP = 0x0002;
     private const uint CF_UNICODETEXT = 13;
 
+    /// <summary>
+    /// Создаёт экземпляр действия вставки в буфер обмена.
+    /// </summary>
+    /// <param name="logger">Логгер.</param>
+    /// <param name="settings">Параметры: AppendNewline (добавлять перенос строки), DelayMs (задержка в мс).</param>
     public ClipboardPasteAction(ILogger<ClipboardPasteAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
@@ -48,12 +62,18 @@ public class ClipboardPasteAction : IPostScanAction
             && int.TryParse(delayStr, out var d) ? d : 50;
     }
 
-    public Task ExecuteAsync(ScanResult scan, CancellationToken ct)
+    /// <summary>
+    /// Вставляет результат сканирования в активное окно.
+    /// Сохраняет предыдущее активное окно, вставляет текст и восстанавливает фокус.
+    /// </summary>
+    /// <param name="scan">Результат сканирования.</param>
+    /// <param name="ct">Токен отмены.</param>
+    public async Task ExecuteAsync(ScanResult scan, CancellationToken ct)
     {
         if (!scan.IsValid)
         {
             _logger.LogDebug("Пропуск вставки: невалидный штрихкод {Raw}", scan.RawData);
-            return Task.CompletedTask;
+            return;
         }
 
         try
@@ -67,29 +87,46 @@ public class ClipboardPasteAction : IPostScanAction
 
             SetClipboardText(text);
 
-            Thread.Sleep(_delayMs);
+            await Task.Delay(_delayMs, ct);
 
             SimulatePaste();
 
-            Thread.Sleep(_delayMs);
+            await Task.Delay(_delayMs, ct);
 
             if (prevWindow != IntPtr.Zero)
                 SetForegroundWindow(prevWindow);
 
-            _logger.LogInformation("Вставлено: {Data}", text.TrimEnd());
+            _logger.LogInformation("Вставлено: {Data}", ControlCharDisplay.ForDisplay(text.TrimEnd()));
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("Вставка отменена: {Data}", ControlCharDisplay.ForDisplay(scan.ParsedData));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка вставки: {Data}", scan.ParsedData);
+            _logger.LogError(ex, "Ошибка вставки: {Data}", ControlCharDisplay.ForDisplay(scan.ParsedData));
         }
-
-        return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Устанавливает текст в буфер обмена Windows через Win32 API.
+    /// </summary>
+    /// <param name="text">Текст для копирования в буфер обмена.</param>
     private static void SetClipboardText(string text)
     {
-        if (!OpenClipboard(IntPtr.Zero))
-            throw new InvalidOperationException("Не удалось открыть буфер обмена");
+        var opened = false;
+        for (var i = 0; i < 10; i++)
+        {
+            if (OpenClipboard(IntPtr.Zero))
+            {
+                opened = true;
+                break;
+            }
+            Thread.Sleep(50);
+        }
+
+        if (!opened)
+            throw new InvalidOperationException("Не удалось открыть буфер обмена после 10 попыток");
 
         try
         {
@@ -99,7 +136,13 @@ public class ClipboardPasteAction : IPostScanAction
             if (hGlobal == IntPtr.Zero)
                 throw new OutOfMemoryException("Не удалось выделить память для буфера обмена");
 
-            SetClipboardData(CF_UNICODETEXT, hGlobal);
+            var result = SetClipboardData(CF_UNICODETEXT, hGlobal);
+
+            if (result == IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(hGlobal);
+                throw new InvalidOperationException("SetClipboardData вернул null");
+            }
         }
         finally
         {
@@ -107,6 +150,9 @@ public class ClipboardPasteAction : IPostScanAction
         }
     }
 
+    /// <summary>
+    /// Эмулирует нажатие Ctrl+V через Win32 API keybd_event.
+    /// </summary>
     private static void SimulatePaste()
     {
         keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);

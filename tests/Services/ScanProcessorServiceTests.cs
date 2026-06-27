@@ -11,6 +11,7 @@ public class ScanProcessorServiceTests
     private readonly Mock<ILogger<ScanProcessorService>> _loggerMock = new();
     private readonly Mock<PostScanManager> _postScanMock;
     private readonly ScanProcessorService _processor;
+    private readonly ScanTracker _scanTracker;
 
     public ScanProcessorServiceTests()
     {
@@ -20,7 +21,8 @@ public class ScanProcessorServiceTests
         _postScanMock = new Mock<PostScanManager>(
             provider,
             new Mock<ILogger<PostScanManager>>().Object);
-        _processor = new ScanProcessorService(_postScanMock.Object, _loggerMock.Object);
+        _scanTracker = new ScanTracker();
+        _processor = new ScanProcessorService(_postScanMock.Object, _scanTracker, _loggerMock.Object);
     }
 
     [Fact]
@@ -47,7 +49,7 @@ public class ScanProcessorServiceTests
     }
 
     [Fact]
-    public async Task ProcessAsync_InvalidBarcode_StillCallsPostScan()
+    public async Task ProcessAsync_InvalidBarcode_DoesNotCallPostScan()
     {
         var scan = new ScanResult
         {
@@ -59,7 +61,7 @@ public class ScanProcessorServiceTests
 
         _postScanMock.Verify(
             x => x.ExecuteAllAsync(scan, It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]
@@ -115,5 +117,39 @@ public class ScanProcessorServiceTests
         cts.Cancel();
 
         await _processor.ProcessAsync(scan, cts.Token);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_RecordsScanTime()
+    {
+        var scan = new ScanResult
+        {
+            RawData = "1234567890123",
+            ScannerName = "TestScanner",
+            IsValid = true
+        };
+
+        await _processor.ProcessAsync(scan, CancellationToken.None);
+
+        var (time, scannerName) = _scanTracker.GetLastScan();
+        Assert.True(time > DateTime.MinValue);
+        Assert.Equal("TestScanner", scannerName);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_InvalidBarcode_DoesNotRecordScanTime()
+    {
+        var scan = new ScanResult
+        {
+            RawData = "XYZ",
+            ScannerName = "BadScanner",
+            IsValid = false
+        };
+
+        await _processor.ProcessAsync(scan, CancellationToken.None);
+
+        var (time, scannerName) = _scanTracker.GetLastScan();
+        Assert.Equal(DateTime.MinValue, time);
+        Assert.Equal(string.Empty, scannerName);
     }
 }

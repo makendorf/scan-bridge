@@ -13,8 +13,9 @@ obj/
 .idea/
 *.sln.docstates
 
-## AiDex
+## MCP
 .aidex/
+.mimocode/
 
 ## Logs
 logs/

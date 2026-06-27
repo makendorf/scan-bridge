@@ -26,7 +26,7 @@ public class ScannerManagerTests : IDisposable
         _postScanMock = new Mock<PostScanManager>(
             provider,
             new Mock<ILogger<PostScanManager>>().Object);
-        _processorMock = new Mock<ScanProcessorService>(_postScanMock.Object, _processorLoggerMock.Object);
+        _processorMock = new Mock<ScanProcessorService>(_postScanMock.Object, new ScanTracker(), _processorLoggerMock.Object);
         _services = new ServiceCollection();
         _services.AddSingleton(_portLoggerMock.Object);
         _services.AddSingleton(_processorMock.Object);

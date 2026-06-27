@@ -1,0 +1,59 @@
+/* ── Log Panel ── */
+.log-toolbar {
+    display: flex; gap: 12px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;
+}
+.log-toolbar label {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 13px; color: var(--color-text-dim); cursor: pointer;
+}
+.log-toolbar input[type=checkbox] { accent-color: var(--color-primary); }
+.log-panel {
+    background: var(--log-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); height: 500px; overflow-y: auto;
+    font-family: 'Fira Code', monospace; font-size: 13px;
+}
+.log-line {
+    padding: 5px 14px; border-bottom: 1px solid var(--color-border);
+    display: flex; gap: 12px; transition: background var(--transition);
+}
+.log-line:hover { background: var(--color-surface-hover); }
+.log-time { color: var(--color-text-muted); min-width: 75px; }
+.log-level { min-width: 40px; font-weight: 600; }
+.log-level-INF { color: var(--color-success); }
+.log-level-WRN { color: var(--color-warning); }
+.log-level-ERR { color: var(--color-danger); }
+.log-level-DBG { color: var(--color-text-muted); }
+.log-msg { color: var(--color-text-dim); word-break: break-all; }
+.log-exc { color: rgba(239, 68, 68, 0.6); font-size: 12px; margin-top: 4px; white-space: pre-wrap; }
+
+/* ── Tooltip ── */
+.hint-trigger {
+    position: relative; display: inline-flex; cursor: help;
+    color: var(--color-text-muted); margin-left: 4px;
+}
+.hint-trigger svg { width: 14px; height: 14px; }
+.hint-trigger .hint-popup {
+    display: none; position: absolute; left: 0; top: 24px;
+    background: var(--color-bg-raised); border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 10px 12px; z-index: 50;
+    width: 280px; font-size: 12px; color: var(--color-text-dim);
+    white-space: pre-line; box-shadow: var(--shadow-md);
+    line-height: 1.5;
+}
+.hint-trigger:hover .hint-popup { display: block; }
+
+/* ── Action Description ── */
+.action-description {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+.action-description:empty { display: none; }
+.action-description strong { color: var(--color-text); }
+.action-description ul { margin: 4px 0 0 16px; padding: 0; }
+.action-description li { margin-bottom: 2px; }

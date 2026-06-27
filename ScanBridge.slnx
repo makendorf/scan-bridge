@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="src/ScanBridge.csproj" />
   <Project Path="tests/ScanBridge.Tests.csproj" />
+  <Project Path="hub/ScanBridgeHub.csproj" />
+  <Project Path="hub.Tests/ScanBridgeHub.Tests.csproj" />
 </Solution>

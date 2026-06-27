@@ -3,15 +3,52 @@ using ScanBridge.Data.Entities;
 
 namespace ScanBridge.Data;
 
+/// <summary>
+/// Контекст базы данных приложения ScanBridge.
+/// Управляет подключением к SQLite и определяет модель данных.
+/// </summary>
 public class AppDbContext : DbContext
 {
+    /// <summary>
+    /// Таблица конфигураций сканеров.
+    /// </summary>
     public DbSet<ScannerConfig> Scanners => Set<ScannerConfig>();
+
+    /// <summary>
+    /// Таблица групп пост-скан действий.
+    /// </summary>
+    public DbSet<PostScanActionGroup> PostScanActionGroups => Set<PostScanActionGroup>();
+
+    /// <summary>
+    /// Таблица пост-скан действий (привязаны к группам).
+    /// </summary>
     public DbSet<PostScanAction> PostScanActions => Set<PostScanAction>();
+
+    /// <summary>
+    /// Таблица связей групп со сканерами.
+    /// </summary>
+    public DbSet<PostScanActionGroupScanner> PostScanActionGroupScanners => Set<PostScanActionGroupScanner>();
+
+    /// <summary>
+    /// Таблица настроек приложения (пары ключ-значение).
+    /// </summary>
     public DbSet<AppSetting> Settings => Set<AppSetting>();
+
+    /// <summary>
+    /// Таблица записей логов.
+    /// </summary>
     public DbSet<LogRecord> Logs => Set<LogRecord>();
 
+    /// <summary>
+    /// Создаёт экземпляр контекста базы данных.
+    /// </summary>
+    /// <param name="options">Параметры подключения к БД.</param>
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+    /// <summary>
+    /// Настраивает модель данных: индексы, ограничения длины полей, связи.
+    /// </summary>
+    /// <param name="modelBuilder">Построитель модели Entity Framework.</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ScannerConfig>(e =>
@@ -24,10 +61,21 @@ public class AppDbContext : DbContext
             e.Property(x => x.Handshake).HasMaxLength(30);
         });
 
+        modelBuilder.Entity<PostScanActionGroup>(e =>
+        {
+            e.Property(x => x.Name).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<PostScanActionGroupScanner>(e =>
+        {
+            e.HasIndex(x => new { x.GroupId, x.ScannerName }).IsUnique();
+            e.Property(x => x.ScannerName).HasMaxLength(100);
+            e.Ignore(x => x.Group);
+        });
+
         modelBuilder.Entity<PostScanAction>(e =>
         {
             e.Property(x => x.Type).HasMaxLength(50);
-            e.Property(x => x.ScannerName).HasMaxLength(100);
             e.Property(x => x.SettingsJson).HasMaxLength(4000);
         });
 

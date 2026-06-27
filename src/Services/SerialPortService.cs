@@ -1,34 +1,57 @@
 using System.IO.Ports;
 using ScanBridge.Models;
 using ScanBridge.Parsers;
+using ScanBridge.Utils;
 
 namespace ScanBridge.Services;
 
+/// <summary>
+/// Сервис работы с serial-портом для чтения данных от сканера штрихкодов.
+/// Наследует BackgroundService для работы в фоновом режиме.
+/// Реализует логику автоматического переподключения с экспоненциальной задержкой.
+/// </summary>
 public class SerialPortService : BackgroundService
 {
     private readonly ILogger<SerialPortService> _logger;
     private readonly SerialPortConfig _config;
     private readonly IBarcodeParser _parser;
     private readonly ScanProcessorService _processor;
+    private readonly ReconnectConfig _reconnect;
     private SerialPort? _serialPort;
 
+    /// <summary>
+    /// Создаёт экземпляр сервиса serial-порта.
+    /// </summary>
+    /// <param name="logger">Логгер.</param>
+    /// <param name="config">Конфигурация serial-порта.</param>
+    /// <param name="parser">Парсер штрихкодов.</param>
+    /// <param name="processor">Сервис обработки результатов сканирования.</param>
+    /// <param name="reconnect">Конфигурация переподключения (если null — используются значения по умолчанию).</param>
     public SerialPortService(
         ILogger<SerialPortService> logger,
         SerialPortConfig config,
         IBarcodeParser parser,
-        ScanProcessorService processor)
+        ScanProcessorService processor,
+        ReconnectConfig? reconnect = null)
     {
         _logger = logger;
         _config = config;
         _parser = parser;
         _processor = processor;
+        _reconnect = reconnect ?? new ReconnectConfig();
     }
 
+    /// <summary>
+    /// Основной цикл чтения данных из serial-порта.
+    /// При ошибке переподключается с экспоненциальной задержкой.
+    /// Останавливается при отмене токена или превышении лимита попыток.
+    /// </summary>
+    /// <param name="stoppingToken">Токен отмены фоновой задачи.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var retryDelay = 1000;
-        const int maxRetryDelay = 30000;
-        const int maxRetries = 10;
+        var retryDelay = Math.Max(_reconnect.DelayMs, 100);
+        var maxRetryDelay = Math.Max(retryDelay * 30, 30000);
+        var maxRetries = _reconnect.Continuous ? int.MaxValue : _reconnect.MaxRetries;
         var retryCount = 0;
 
         while (!stoppingToken.IsCancellationRequested)
@@ -36,7 +59,7 @@ public class SerialPortService : BackgroundService
             try
             {
                 OpenPort();
-                retryDelay = 1000;
+                retryDelay = Math.Max(_reconnect.DelayMs, 100);
                 retryCount = 0;
                 _logger.LogInformation("[{Scanner}] Прослушивание порта {Port} ({Baud}/{DataBits}/{Parity}/{StopBits})",
                     _config.Name, _config.PortName, _config.BaudRate, _config.DataBits, _config.Parity, _config.StopBits);
@@ -51,11 +74,11 @@ public class SerialPortService : BackgroundService
                         if (bytesRead > 0)
                         {
                             var raw = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                            var result = _parser.Parse(raw);
+                            var result = _parser.Parse(raw, _config.ControlCharMode);
                             result.ScannerName = _config.Name;
 
                             _logger.LogInformation("[{Scanner}] Сканирование: Исходные={Raw}, Формат={Format}, Тип={ContentType}, Валидно={Valid}",
-                                _config.Name, result.RawData, result.Format, result.ContentType, result.IsValid);
+                                _config.Name, ControlCharDisplay.ForDisplay(result.RawData), result.Format, result.ContentType, result.IsValid);
 
                             await _processor.ProcessAsync(result, stoppingToken);
                         }
@@ -73,8 +96,8 @@ public class SerialPortService : BackgroundService
             {
                 if (stoppingToken.IsCancellationRequested) break;
                 retryCount++;
-                _logger.LogError(ex, "[{Scanner}] Ошибка COM-порта (попытка {Retry}/{MaxRetries}), переподключение через {Delay} сек...",
-                    _config.Name, retryCount, maxRetries, retryDelay / 1000);
+                _logger.LogError(ex, "[{Scanner}] Ошибка COM-порта (попытка {Retry}), переподключение через {Delay} сек...",
+                    _config.Name, retryCount, retryDelay / 1000);
                 LogAvailablePorts();
                 ClosePort();
                 try { await Task.Delay(retryDelay, stoppingToken); }
@@ -82,9 +105,17 @@ public class SerialPortService : BackgroundService
                 retryDelay = Math.Min(retryDelay * 2, maxRetryDelay);
                 if (retryCount >= maxRetries)
                 {
-                    _logger.LogCritical("[{Scanner}] Превышен лимит попыток переподключения ({MaxRetries}). Остановка сканера.",
-                        _config.Name, maxRetries);
-                    break;
+                    if (_reconnect.Continuous)
+                    {
+                        _logger.LogWarning("[{Scanner}] Непрерывное переподключение: попытка {Retry}, следующая через {Delay} сек...",
+                            _config.Name, retryCount, retryDelay / 1000);
+                    }
+                    else
+                    {
+                        _logger.LogCritical("[{Scanner}] Превышен лимит попыток переподключения ({MaxRetries}). Остановка сканера.",
+                            _config.Name, _reconnect.MaxRetries);
+                        break;
+                    }
                 }
             }
         }
@@ -92,18 +123,29 @@ public class SerialPortService : BackgroundService
         ClosePort();
     }
 
+    /// <summary>
+    /// Открывает serial-порт с параметрами из конфигурации.
+    /// Предварительно закрывает текущий порт, если он открыт.
+    /// </summary>
     private void OpenPort()
     {
         ClosePort();
+
+        if (!Enum.TryParse<Parity>(_config.Parity, true, out var parity))
+            throw new ArgumentException($"Невалидное значение Parity: '{_config.Parity}'");
+        if (!Enum.TryParse<StopBits>(_config.StopBits, true, out var stopBits))
+            throw new ArgumentException($"Невалидное значение StopBits: '{_config.StopBits}'");
+        if (!Enum.TryParse<Handshake>(_config.Handshake, true, out var handshake))
+            throw new ArgumentException($"Невалидное значение Handshake: '{_config.Handshake}'");
 
         _serialPort = new SerialPort
         {
             PortName = _config.PortName,
             BaudRate = _config.BaudRate,
             DataBits = _config.DataBits,
-            Parity = Enum.Parse<Parity>(_config.Parity),
-            StopBits = Enum.Parse<StopBits>(_config.StopBits),
-            Handshake = Enum.Parse<Handshake>(_config.Handshake),
+            Parity = parity,
+            StopBits = stopBits,
+            Handshake = handshake,
             ReadTimeout = Math.Clamp(_config.ReadTimeout, 50, 5000),
             WriteTimeout = _config.WriteTimeout
         };
@@ -111,6 +153,10 @@ public class SerialPortService : BackgroundService
         _serialPort.Open();
     }
 
+    /// <summary>
+    /// Закрывает и освобождает serial-порт.
+    /// Очищает входной и выходной буферы перед закрытием.
+    /// </summary>
     private void ClosePort()
     {
         try
@@ -126,13 +172,19 @@ public class SerialPortService : BackgroundService
                 _serialPort.Dispose();
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[{Scanner}] Ошибка при закрытии порта", _config.Name);
+        }
         finally
         {
             _serialPort = null;
         }
     }
 
+    /// <summary>
+    /// Логирует список доступных COM-портов для диагностики проблем подключения.
+    /// </summary>
     private void LogAvailablePorts()
     {
         try
@@ -149,6 +201,9 @@ public class SerialPortService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Освобождает ресурсы: закрывает serial-порт.
+    /// </summary>
     public override void Dispose()
     {
         ClosePort();

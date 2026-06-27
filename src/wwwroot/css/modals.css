@@ -1,0 +1,34 @@
+/* ── Modal ── */
+.modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: var(--modal-backdrop);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+    animation: fadeIn 0.2s ease;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+    background: var(--color-bg-raised); border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl); padding: 28px;
+    width: 90%; max-width: 640px; max-height: 85vh;
+    overflow-y: auto; box-shadow: var(--shadow-lg);
+    animation: modalIn 0.25s ease;
+}
+@keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px;
+}
+.modal-header h2 { font-size: 18px; font-weight: 600; color: var(--color-text); }
+
+/* ── Toast ── */
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+    padding: 12px 20px; border-radius: var(--radius-md);
+    font-size: 14px; display: flex; align-items: center; gap: 8px;
+    animation: toastIn 0.3s ease; box-shadow: var(--shadow-md);
+    backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+}
+.toast-success { background: rgba(34, 197, 94, 0.15); color: var(--color-success); border: 1px solid rgba(34, 197, 94, 0.3); }
+.toast-error { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+@keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

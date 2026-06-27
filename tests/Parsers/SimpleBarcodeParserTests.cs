@@ -10,11 +10,10 @@ public class SimpleBarcodeParserTests
     [InlineData("")]
     [InlineData("  ")]
     [InlineData(null)]
-    public void Parse_EmptyOrWhitespace_ReturnsInvalid(string? input)
+    public void Parse_EmptyOrWhitespace_ReturnsEmptyFormat(string? input)
     {
         var result = _parser.Parse(input ?? string.Empty);
 
-        Assert.False(result.IsValid);
         Assert.Equal("Empty", result.Format);
     }
 
@@ -49,21 +48,21 @@ public class SimpleBarcodeParserTests
     [Theory]
     [InlineData("AB")]
     [InlineData("X9")]
-    public void Parse_ShortAlphanumeric_ReturnsInvalid(string input)
+    public void Parse_ShortAlphanumeric_ReturnsCode128(string input)
     {
         var result = _parser.Parse(input);
 
-        Assert.False(result.IsValid);
+        Assert.Equal("Code128", result.Format);
     }
 
     [Theory]
     [InlineData("hello world")]
     [InlineData("test!@#")]
-    public void Parse_NonAlphanumeric_ReturnsInvalid(string input)
+    public void Parse_NonAlphanumeric_ReturnsCode128Format(string input)
     {
         var result = _parser.Parse(input);
 
-        Assert.False(result.IsValid);
+        Assert.Equal("Code128", result.Format);
     }
 
     [Fact]
@@ -144,29 +143,26 @@ public class SimpleBarcodeParserTests
     }
 
     [Fact]
-    public void Parse_WhitespaceOnly_ReturnsInvalid()
+    public void Parse_WhitespaceOnly_ReturnsEmptyFormat()
     {
         var result = _parser.Parse("   ");
 
-        Assert.False(result.IsValid);
         Assert.Equal("Empty", result.Format);
     }
 
     [Fact]
-    public void Parse_TabsOnly_ReturnsInvalid()
+    public void Parse_TabsOnly_ReturnsEmptyFormat()
     {
         var result = _parser.Parse("\t\t");
 
-        Assert.False(result.IsValid);
         Assert.Equal("Empty", result.Format);
     }
 
     [Fact]
-    public void Parse_NewlinesOnly_ReturnsInvalid()
+    public void Parse_NewlinesOnly_ReturnsEmptyFormat()
     {
         var result = _parser.Parse("\n\n");
 
-        Assert.False(result.IsValid);
         Assert.Equal("Empty", result.Format);
     }
 
@@ -198,11 +194,11 @@ public class SimpleBarcodeParserTests
     }
 
     [Fact]
-    public void Parse_3AlphanumericChars_ReturnsInvalid()
+    public void Parse_3AlphanumericChars_ReturnsCode128Format()
     {
         var result = _parser.Parse("ABC");
 
-        Assert.False(result.IsValid);
+        Assert.Equal("Code128", result.Format);
     }
 
     [Fact]
@@ -224,11 +220,11 @@ public class SimpleBarcodeParserTests
     }
 
     [Fact]
-    public void Parse_SpecialChars_ReturnsInvalid()
+    public void Parse_SpecialChars_ReturnsCode128Format()
     {
         var result = _parser.Parse("Hello World!");
 
-        Assert.False(result.IsValid);
+        Assert.Equal("Code128", result.Format);
     }
 
     [Fact]
@@ -279,11 +275,11 @@ public class SimpleBarcodeParserTests
     [InlineData("123e4567e89b-12d3-a456-426655448888")]
     [InlineData("123e4567-e89b-12d3-a456")]
     [InlineData("123e4567-e89b-12d3-a456-42665544888g")]
-    public void Parse_InvalidUuid_ReturnsInvalid(string input)
+    public void Parse_InvalidUuid_ReturnsCode128Format(string input)
     {
         var result = _parser.Parse(input);
 
-        Assert.False(result.IsValid);
+        Assert.Equal("Code128", result.Format);
     }
 
     [Fact]
@@ -404,5 +400,85 @@ public class SimpleBarcodeParserTests
 
         Assert.Equal("EAN-13", result.Format);
         Assert.Equal("Text", result.ContentType);
+    }
+
+    [Theory]
+    [MemberData(nameof(ControlCharsAroundValidBarcode_Data))]
+    public void Parse_ControlCharsAroundValidBarcode_StripsAndReturnsValid(string input)
+    {
+        var result = _parser.Parse(input);
+
+        Assert.True(result.IsValid);
+        Assert.True(result.ParsedData.All(c => !char.IsControl(c) || c == '\t' || c == '\n' || c == '\r'),
+            $"ParsedData contains hidden control chars: [{string.Join(",", result.ParsedData.Select(x => $"0x{(int)x:X2}"))}]");
+    }
+
+    public static IEnumerable<object[]> ControlCharsAroundValidBarcode_Data => new List<object[]>
+    {
+        new object[] { "\012345678\0" },
+        new object[] { "\r\nABC12345\r\n" },
+        new object[] { new string(new[] { '\u0003', '\u0004', 'A', 'B', 'C', '1', '2', '3', '4', '5', '\u0003' }) },
+    };
+
+    [Fact]
+    public void Parse_OnlyControlChars_ReturnsEmptyFormat()
+    {
+        var input = new string(new[] { '\u0000', '\u0001', '\u0002', '\u0003' });
+        var result = _parser.Parse(input);
+
+        Assert.Equal("Empty", result.Format);
+    }
+
+    [Fact]
+    public void Parse_ControlCharsAtStart_StripsAndParses()
+    {
+        var input = new string(new[] { '\u0002', 'A', 'B', 'C', '1', '2', '3', '4', '5', '6' });
+        var result = _parser.Parse(input);
+
+        Assert.True(result.IsValid);
+        Assert.Equal("ABC123456", result.ParsedData);
+        Assert.Equal(input, result.RawData);
+    }
+
+    [Fact]
+    public void Parse_ControlCharsAtEnd_StripsAndParses()
+    {
+        var input = "ABC123456" + new string(new[] { '\u0003', '\u0004' });
+        var result = _parser.Parse(input);
+
+        Assert.True(result.IsValid);
+        Assert.Equal("ABC123456", result.ParsedData);
+    }
+
+    [Fact]
+    public void Parse_MultipleControlChars_StripsAll()
+    {
+        var input = new string(new[] { '\u0000', '\u0001', '\u0002', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '\u001D', '\u001E' });
+        var result = _parser.Parse(input);
+
+        Assert.True(result.IsValid);
+        Assert.Equal("1234567890123", result.ParsedData);
+        Assert.Equal("EAN-13", result.Format);
+    }
+
+    [Fact]
+    public void Parse_NullCharInBarcode_PreservesContent()
+    {
+        var input = "0104603239000351215rvvipJBqimFa93voYc";
+        var result = _parser.Parse(input);
+
+        Assert.True(result.IsValid);
+        Assert.Equal("Code128", result.Format);
+    }
+
+    [Fact]
+    public void Parse_GS1FunctionChar_StripsAndParses()
+    {
+        var input = new string(new[] { '\u001D', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '\u001D' });
+        var result = _parser.Parse(input);
+
+        Assert.True(result.IsValid);
+        Assert.Equal("12345678901234", result.ParsedData);
+        Assert.Equal("GTIN-14", result.Format);
     }
 }

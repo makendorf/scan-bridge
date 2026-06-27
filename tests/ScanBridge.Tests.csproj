@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\xTrack-Mercury-Scan.csproj" />
+    <ProjectReference Include="..\src\ScanBridge.csproj" />
   </ItemGroup>
 
   <ItemGroup>

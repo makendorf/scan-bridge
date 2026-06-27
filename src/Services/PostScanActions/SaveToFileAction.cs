@@ -8,8 +8,15 @@ using ScanBridge.Models;
 
 namespace ScanBridge.Services.PostScanActions;
 
+/// <summary>
+/// Действие экспорта результата сканирования в файл или внешний сервис.
+/// Поддерживает локальное сохранение, FTP, SFTP и HTTP POST.
+/// </summary>
 public class ExportAction : IPostScanAction
 {
+    /// <summary>
+    /// Тип действия.
+    /// </summary>
     public string Type => "Export";
 
     private readonly ILogger<ExportAction> _logger;
@@ -29,6 +36,11 @@ public class ExportAction : IPostScanAction
     private readonly string _httpContentType;
     private readonly Dictionary<string, string> _httpHeaders = new();
 
+    /// <summary>
+    /// Создаёт экземпляр действия экспорта.
+    /// </summary>
+    /// <param name="logger">Логгер.</param>
+    /// <param name="settings">Параметры экспорта: Format, FilenameTemplate, Destination, FolderPath, Ftp*, Http*.</param>
     public ExportAction(ILogger<ExportAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
@@ -62,7 +74,10 @@ public class ExportAction : IPostScanAction
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (headers != null) _httpHeaders = headers;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Export: ошибка разбора HTTP заголовков");
+            }
         }
 
         if (settings.TryGetValue("Tags", out var json) && !string.IsNullOrWhiteSpace(json))
@@ -73,7 +88,10 @@ public class ExportAction : IPostScanAction
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (parsed != null) _tags = parsed;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Export: ошибка разбора Tags");
+            }
         }
 
         if (_tags.Count == 0)
@@ -90,6 +108,11 @@ public class ExportAction : IPostScanAction
         }
     }
 
+    /// <summary>
+    /// Экспортирует результат сканирования в указанное назначение.
+    /// </summary>
+    /// <param name="scan">Результат сканирования.</param>
+    /// <param name="ct">Токен отмены.</param>
     public async Task ExecuteAsync(ScanResult scan, CancellationToken ct)
     {
         var content = _format == "xml" ? BuildXml(scan) : BuildJson(scan);
@@ -123,6 +146,11 @@ public class ExportAction : IPostScanAction
         }
     }
 
+    /// <summary>
+    /// Сохраняет файл локально в указанную папку.
+    /// </summary>
+    /// <param name="bytes">Содержимое файла в байтах.</param>
+    /// <param name="filename">Имя файла.</param>
     private void SaveLocal(byte[] bytes, string filename)
     {
         if (string.IsNullOrWhiteSpace(_folderPath))
@@ -134,6 +162,12 @@ public class ExportAction : IPostScanAction
         File.WriteAllBytes(Path.Combine(_folderPath, filename), bytes);
     }
 
+    /// <summary>
+    /// Загружает файл на FTP-сервер через FluentFTP.
+    /// </summary>
+    /// <param name="bytes">Содержимое файла.</param>
+    /// <param name="filename">Имя файла на сервере.</param>
+    /// <param name="ct">Токен отмены.</param>
     private async Task UploadFtp(byte[] bytes, string filename, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_ftpHost))
@@ -154,6 +188,13 @@ public class ExportAction : IPostScanAction
         await client.Disconnect(ct);
     }
 
+    /// <summary>
+    /// Загружает файл на SFTP-сервер через Renci.SshNet.
+    /// Автоматически создаёт удалённые директории при необходимости.
+    /// </summary>
+    /// <param name="bytes">Содержимое файла.</param>
+    /// <param name="filename">Имя файла на сервере.</param>
+    /// <param name="ct">Токен отмены.</param>
     private async Task UploadSftp(byte[] bytes, string filename, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_ftpHost))
@@ -181,10 +222,17 @@ public class ExportAction : IPostScanAction
         }
 
         using var ms = new MemoryStream(bytes);
-        await ms.CopyToAsync(client.OpenWrite(remotePath), ct);
+        using var stream = client.OpenWrite(remotePath);
+        await ms.CopyToAsync(stream, ct);
+        await stream.FlushAsync(ct);
         client.Disconnect();
     }
 
+    /// <summary>
+    /// Отправляет данные на HTTP-сервер через POST-запрос.
+    /// </summary>
+    /// <param name="content">Текстовое содержимое запроса.</param>
+    /// <param name="ct">Токен отмены.</param>
     private async Task PostHttp(string content, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(_httpUrl))
@@ -193,8 +241,7 @@ public class ExportAction : IPostScanAction
             return;
         }
 
-        using var client = new HttpClient();
-        client.Timeout = TimeSpan.FromSeconds(30);
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
 
         foreach (var header in _httpHeaders)
         {
@@ -209,6 +256,11 @@ public class ExportAction : IPostScanAction
         _logger.LogInformation("Export HTTP: {Url} → {Status}", _httpUrl, (int)response.StatusCode);
     }
 
+    /// <summary>
+    /// Формирует JSON-представление результата сканирования на основе тегов.
+    /// </summary>
+    /// <param name="scan">Результат сканирования.</param>
+    /// <returns>Форматированная JSON-строка.</returns>
     private string BuildJson(ScanResult scan)
     {
         var dict = new Dictionary<string, object>();
@@ -217,6 +269,11 @@ public class ExportAction : IPostScanAction
         return JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
     }
 
+    /// <summary>
+    /// Формирует XML-представление результата сканирования на основе тегов.
+    /// </summary>
+    /// <param name="scan">Результат сканирования.</param>
+    /// <returns>XML-строка с корневым элементом ScanResult.</returns>
     private string BuildXml(ScanResult scan)
     {
         var root = new XElement("ScanResult");
@@ -228,6 +285,12 @@ public class ExportAction : IPostScanAction
             : doc.ToString();
     }
 
+    /// <summary>
+    /// Определяет значение тега на основе его источника и данных сканирования.
+    /// </summary>
+    /// <param name="tag">Конфигурация тега.</param>
+    /// <param name="scan">Результат сканирования.</param>
+    /// <returns>Значение тега в виде объекта.</returns>
     private static object ResolveValue(TagConfig tag, ScanResult scan)
     {
         return tag.Source switch
@@ -245,6 +308,11 @@ public class ExportAction : IPostScanAction
         };
     }
 
+    /// <summary>
+    /// Генерирует имя файла на основе шаблона и данных сканирования.
+    /// </summary>
+    /// <param name="scan">Результат сканирования.</param>
+    /// <returns>Имя файла без расширения.</returns>
     private string MakeFilename(ScanResult scan)
     {
         return _filenameTemplate
@@ -254,6 +322,11 @@ public class ExportAction : IPostScanAction
             .Replace("{format}", Sanitize(scan.Format));
     }
 
+    /// <summary>
+    /// Удаляет из строки недопустимые символы для имени файла.
+    /// </summary>
+    /// <param name="value">Исходная строка.</param>
+    /// <returns>Строка с заменёнными недопустимыми символами на подчёркивание.</returns>
     private static string Sanitize(string value)
     {
         var invalid = Path.GetInvalidFileNameChars();
@@ -263,10 +336,25 @@ public class ExportAction : IPostScanAction
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Конфигурация тега для экспорта: ключ, источник данных и опциональное статическое значение.
+    /// </summary>
     public class TagConfig
     {
+        /// <summary>
+        /// Ключ (имя поля) в выходном JSON/XML.
+        /// </summary>
         public string Key { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Источник данных: Timestamp, ScannerName, RawData, ParsedData, Format, IsValid,
+        /// ContentType, ParsedContent, Custom.
+        /// </summary>
         public string Source { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Статическое значение (используется при Source = "Custom").
+        /// </summary>
         public string? Value { get; set; }
     }
 }

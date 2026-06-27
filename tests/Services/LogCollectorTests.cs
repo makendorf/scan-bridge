@@ -81,9 +81,9 @@ public class LogCollectorTests : IDisposable
     [Fact]
     public void Add_SetsTimestamp()
     {
-        var before = DateTime.Now;
+        var before = DateTime.UtcNow;
         _collector.Add("INF", "Test");
-        var after = DateTime.Now;
+        var after = DateTime.UtcNow;
 
         var entries = GetEntries();
         Assert.InRange(entries[0].Timestamp, before, after);
