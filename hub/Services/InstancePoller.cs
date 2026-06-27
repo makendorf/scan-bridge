@@ -243,8 +243,8 @@ public class InstancePoller : BackgroundService
         {
             var scannersTask = GetJsonList($"{baseUrl}/api/scanners/status", ct);
             var logsTask = GetJsonList($"{baseUrl}/api/logs?limit=500", ct);
-            var actionsTask = GetJsonElement($"{baseUrl}/api/postscan/actions", ct);
-            var lastScanTask = GetJsonElement($"{baseUrl}/api/scanners/lastscan", ct);
+            var actionsTask = GetJsonElementOrNull($"{baseUrl}/api/postscan/groups", ct);
+            var lastScanTask = GetJsonElementOrNull($"{baseUrl}/api/scanners/lastscan", ct);
 
             await Task.WhenAll(scannersTask, logsTask, actionsTask, lastScanTask);
 
@@ -253,10 +253,13 @@ public class InstancePoller : BackgroundService
             cached.Actions = await actionsTask;
 
             var lastScan = await lastScanTask;
-            if (lastScan.TryGetProperty("time", out var timeProp) && timeProp.ValueKind == JsonValueKind.String)
-                cached.LastScanTime = DateTime.Parse(timeProp.GetString()!);
-            if (lastScan.TryGetProperty("scannerName", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
-                cached.LastScannerName = nameProp.GetString() ?? string.Empty;
+            if (lastScan is { } ls)
+            {
+                if (ls.TryGetProperty("time", out var timeProp) && timeProp.ValueKind == JsonValueKind.String)
+                    cached.LastScanTime = DateTime.Parse(timeProp.GetString()!);
+                if (ls.TryGetProperty("scannerName", out var nameProp) && nameProp.ValueKind == JsonValueKind.String)
+                    cached.LastScannerName = nameProp.GetString() ?? string.Empty;
+            }
 
             cached.Online = true;
             cached.LastPoll = DateTime.UtcNow;
@@ -329,5 +332,20 @@ public class InstancePoller : BackgroundService
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<JsonElement>(content);
+    }
+
+    private async Task<JsonElement?> GetJsonElementOrNull(string url, CancellationToken ct)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            var content = await response.Content.ReadAsStringAsync(ct);
+            return JsonSerializer.Deserialize<JsonElement>(content);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
