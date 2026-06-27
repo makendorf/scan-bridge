@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using ScanBridgeHub.Data;
 using ScanBridgeHub.Models;
@@ -53,13 +54,17 @@ public class CachedInstanceData
 /// <summary>
 /// Фоновый сервис опроса удалённых экземпляров ScanBridge.
 /// Периодически запрашивает данные у каждого экземпляра и кэширует результаты.
+/// После каждого цикла отправляет обновление через SignalR.
 /// </summary>
 public class InstancePoller : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<InstancePoller> _logger;
     private readonly HttpClient _httpClient;
+    private readonly IHubContext<StatsHub> _hubContext;
+    private readonly AlertService _alertService;
     private readonly ConcurrentDictionary<int, CachedInstanceData> _cache = new();
+    private readonly ConcurrentDictionary<int, DateTime> _lastKnownScanTimes = new();
     private int _pollIntervalMs = 5000;
 
     /// <summary>
@@ -78,12 +83,21 @@ public class InstancePoller : BackgroundService
     /// <param name="scopeFactory">Фабрика scope'ов для доступа к БД.</param>
     /// <param name="logger">Логгер.</param>
     /// <param name="httpClientFactory">Фабрика HTTP-клиентов.</param>
-    public InstancePoller(IServiceScopeFactory scopeFactory, ILogger<InstancePoller> logger, IHttpClientFactory httpClientFactory)
+    /// <param name="hubContext">Контекст SignalR Hub для отправки обновлений.</param>
+    /// <param name="alertService">Сервис алертов.</param>
+    public InstancePoller(
+        IServiceScopeFactory scopeFactory,
+        ILogger<InstancePoller> logger,
+        IHttpClientFactory httpClientFactory,
+        IHubContext<StatsHub> hubContext,
+        AlertService alertService)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _httpClient = httpClientFactory.CreateClient();
         _httpClient.Timeout = TimeSpan.FromSeconds(3);
+        _hubContext = hubContext;
+        _alertService = alertService;
     }
 
     /// <summary>
@@ -111,8 +125,8 @@ public class InstancePoller : BackgroundService
         => new(_cache);
 
     /// <summary>
-    /// Основной цикл опроса: запрашивает данные у всех активных экземпляров
-    /// и вызывает событие OnUpdate после каждого цикла.
+    /// Основной цикл опроса: запрашивает данные у всех активных экземпляров,
+    /// вызывает событие OnUpdate и отправляет обновление через SignalR.
     /// </summary>
     /// <param name="stoppingToken">Токен отмены.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -125,6 +139,7 @@ public class InstancePoller : BackgroundService
             {
                 await PollAllInstances(stoppingToken);
                 OnUpdate?.Invoke();
+                await BroadcastStatsUpdate(stoppingToken);
             }
             catch (Exception ex)
             {
@@ -132,6 +147,70 @@ public class InstancePoller : BackgroundService
             }
 
             await Task.Delay(_pollIntervalMs, stoppingToken);
+        }
+    }
+
+    /// <summary>
+    /// Отправляет агрегированную статистику всем подключённым клиентам через SignalR.
+    /// </summary>
+    /// <param name="ct">Токен отмены.</param>
+    private async Task BroadcastStatsUpdate(CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<HubDbContext>();
+            var instances = await db.Instances.OrderBy(i => i.SortOrder).ToListAsync(ct);
+            var allCached = GetAllCached();
+
+            var totalScanners = 0;
+            var onlineCount = 0;
+            var totalActions = 0;
+
+            var instanceDetails = new List<object>();
+            foreach (var inst in instances)
+            {
+                var cached = allCached.TryGetValue(inst.Id, out var c) ? c : null;
+                var online = cached?.Online ?? false;
+                if (online) onlineCount++;
+
+                var scannerCount = cached?.Scanners?.Count ?? 0;
+                totalScanners += scannerCount;
+
+                var actionCount = 0;
+                if (cached?.Actions is { } actionsEl && actionsEl.TryGetProperty("configs", out var configs))
+                    actionCount = configs.GetArrayLength();
+                totalActions += actionCount;
+
+                instanceDetails.Add(new
+                {
+                    inst.Id,
+                    inst.Name,
+                    inst.Host,
+                    inst.Port,
+                    inst.Enabled,
+                    online,
+                    lastPoll = cached?.LastPoll,
+                    scannerCount,
+                    actionCount,
+                    lastScanTime = cached?.LastScanTime,
+                    lastScannerName = cached?.LastScannerName ?? string.Empty
+                });
+            }
+
+            await _hubContext.Clients.All.SendAsync("StatsUpdate", new
+            {
+                totalServers = instances.Count,
+                onlineServers = onlineCount,
+                totalScanners,
+                totalActions,
+                pollInterval = _pollIntervalMs,
+                instances = instanceDetails
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Ошибка отправки StatsUpdate через SignalR");
         }
     }
 
@@ -181,6 +260,14 @@ public class InstancePoller : BackgroundService
 
             cached.Online = true;
             cached.LastPoll = DateTime.UtcNow;
+
+            _alertService.CheckForAlerts(instance.Id, instance.Name, true, null);
+
+            if (_lastKnownScanTimes.TryGetValue(instance.Id, out var prevScanTime) && cached.LastScanTime > prevScanTime && cached.LastScanTime != DateTime.MinValue)
+            {
+                await SaveScanEvent(instance, cached.LastScannerName, cached.LastScanTime, ct);
+            }
+            _lastKnownScanTimes[instance.Id] = cached.LastScanTime;
         }
         catch (Exception ex)
         {
@@ -188,6 +275,31 @@ public class InstancePoller : BackgroundService
             cached.LastPoll = DateTime.UtcNow;
             _logger.LogWarning("Сервер {Name} ({Host}:{Port}) недоступен: {Error}",
                 instance.Name, instance.Host, instance.Port, ex.Message);
+
+            _alertService.CheckForAlerts(instance.Id, instance.Name, false, null);
+        }
+    }
+
+    private async Task SaveScanEvent(RemoteInstance instance, string scannerName, DateTime scanTime, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<HubDbContext>();
+            var scanEvent = new ScanEvent
+            {
+                InstanceId = instance.Id,
+                InstanceName = instance.Name,
+                ScannerName = scannerName,
+                Timestamp = scanTime,
+                ReceivedAt = DateTime.UtcNow
+            };
+            db.ScanEvents.Add(scanEvent);
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to save scan event for {Instance}", instance.Name);
         }
     }
 

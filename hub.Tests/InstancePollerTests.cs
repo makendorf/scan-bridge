@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -41,10 +42,18 @@ public class InstancePollerTests : IDisposable
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
         httpClientFactoryMock.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
+        var hubContextMock = new Mock<IHubContext<StatsHub>>();
+        var alertServiceMock = new Mock<AlertService>(
+            scopeFactoryMock.Object,
+            new Mock<ILogger<AlertService>>().Object,
+            httpClientFactoryMock.Object);
+
         _poller = new InstancePoller(
             scopeFactoryMock.Object,
             new Mock<ILogger<InstancePoller>>().Object,
-            httpClientFactoryMock.Object);
+            httpClientFactoryMock.Object,
+            hubContextMock.Object,
+            alertServiceMock.Object);
     }
 
     public void Dispose()

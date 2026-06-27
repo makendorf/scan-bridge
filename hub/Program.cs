@@ -13,8 +13,11 @@ builder.WebHost.UseUrls("http://0.0.0.0:5001");
 builder.Services.AddDbContext<HubDbContext>(options =>
     options.UseSqlite("Data Source=hub.db"));
 builder.Services.AddHttpClient();
+builder.Services.AddSignalR();
 builder.Services.AddSingleton<InstancePoller>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<InstancePoller>());
+builder.Services.AddSingleton<AlertService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AlertService>());
 
 builder.Services.AddCors(options =>
 {
@@ -46,8 +49,95 @@ using (var scope = app.Services.CreateScope())
 }
 
 var poller = app.Services.GetRequiredService<InstancePoller>();
+var alertService = app.Services.GetRequiredService<AlertService>();
 
 app.UseCors();
+
+// ── SignalR Hub ──
+
+app.MapHub<StatsHub>("/hubs/stats");
+
+// ── API: Удалённое управление сканерами ──
+
+/// <summary>
+/// POST /api/instances/{id}/scanners/{name}/restart — перезапускает сканер на удалённом экземпляре.
+/// </summary>
+app.MapPost("/api/instances/{id:int}/scanners/{name}/restart", async (int id, string name, HubDbContext db, IHttpClientFactory httpClientFactory) =>
+{
+    var instance = await db.Instances.FindAsync(id);
+    if (instance == null) return Results.NotFound(new { error = "Сервер не найден" });
+
+    try
+    {
+        var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
+        var url = $"http://{instance.Host}:{instance.Port}/api/scanners/{Uri.EscapeDataString(name)}/restart";
+        var response = await client.PostAsync(url, null);
+        var content = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            return Results.StatusCode((int)response.StatusCode);
+        return Results.Ok(System.Text.Json.JsonSerializer.Deserialize<object>(content));
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Ошибка перезапуска сканера {Name} на {Instance}", name, instance.Name);
+        return Results.BadRequest(new { error = $"Сервер '{instance.Name}' недоступен: {ex.Message}" });
+    }
+});
+
+/// <summary>
+/// POST /api/instances/{id}/scanners — добавляет сканер на удалённом экземпляре.
+/// </summary>
+app.MapPost("/api/instances/{id:int}/scanners", async (int id, HubDbContext db, IHttpClientFactory httpClientFactory, object scannerConfig) =>
+{
+    var instance = await db.Instances.FindAsync(id);
+    if (instance == null) return Results.NotFound(new { error = "Сервер не найден" });
+
+    try
+    {
+        var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
+        var url = $"http://{instance.Host}:{instance.Port}/api/scanners";
+        var json = System.Text.Json.JsonSerializer.Serialize(scannerConfig);
+        var body = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var response = await client.PostAsync(url, body);
+        var content = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            return Results.StatusCode((int)response.StatusCode);
+        return Results.Ok(System.Text.Json.JsonSerializer.Deserialize<object>(content));
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Ошибка добавления сканера на {Instance}", instance.Name);
+        return Results.BadRequest(new { error = $"Сервер '{instance.Name}' недоступен: {ex.Message}" });
+    }
+});
+
+/// <summary>
+/// DELETE /api/instances/{id}/scanners/{index} — удаляет сканер на удалённом экземпляре.
+/// </summary>
+app.MapDelete("/api/instances/{id:int}/scanners/{index:int}", async (int id, int index, HubDbContext db, IHttpClientFactory httpClientFactory) =>
+{
+    var instance = await db.Instances.FindAsync(id);
+    if (instance == null) return Results.NotFound(new { error = "Сервер не найден" });
+
+    try
+    {
+        var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
+        var url = $"http://{instance.Host}:{instance.Port}/api/scanners/{index}";
+        var response = await client.DeleteAsync(url);
+        var content = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            return Results.StatusCode((int)response.StatusCode);
+        return Results.Ok(System.Text.Json.JsonSerializer.Deserialize<object>(content));
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Ошибка удаления сканера {Index} на {Instance}", index, instance.Name);
+        return Results.BadRequest(new { error = $"Сервер '{instance.Name}' недоступен: {ex.Message}" });
+    }
+});
 
 // ── API: Управление экземплярами ──
 
@@ -213,6 +303,92 @@ app.MapPut("/api/settings/poll-interval", (PollIntervalRequest req) =>
     poller.SetPollInterval(req.IntervalMs);
     Log.Information("Интервал опроса изменён на {Interval}мс", poller.PollIntervalMs);
     return Results.Ok(new { intervalMs = poller.PollIntervalMs });
+});
+
+// ── API: Алерты ──
+
+app.MapGet("/api/alerts", async (HubDbContext db) =>
+{
+    var alerts = await db.Alerts.OrderBy(a => a.Id).ToListAsync();
+    return Results.Ok(alerts);
+});
+
+app.MapPost("/api/alerts", async (HubDbContext db, AlertRuleRequest req) =>
+{
+    var rule = new AlertRule
+    {
+        Name = req.Name,
+        Type = req.Type,
+        Enabled = req.Enabled,
+        SettingsJson = System.Text.Json.JsonSerializer.Serialize(req.Settings ?? new())
+    };
+    db.Alerts.Add(rule);
+    await db.SaveChangesAsync();
+    Log.Information("Alert rule created: {Name} ({Type})", rule.Name, rule.Type);
+    return Results.Ok(rule);
+});
+
+app.MapPut("/api/alerts/{id:int}", async (int id, HubDbContext db, AlertRuleRequest req) =>
+{
+    var rule = await db.Alerts.FindAsync(id);
+    if (rule == null) return Results.NotFound();
+    rule.Name = req.Name;
+    rule.Type = req.Type;
+    rule.Enabled = req.Enabled;
+    rule.SettingsJson = System.Text.Json.JsonSerializer.Serialize(req.Settings ?? new());
+    await db.SaveChangesAsync();
+    Log.Information("Alert rule updated: {Name} ({Type})", rule.Name, rule.Type);
+    return Results.Ok(rule);
+});
+
+app.MapDelete("/api/alerts/{id:int}", async (int id, HubDbContext db) =>
+{
+    var rule = await db.Alerts.FindAsync(id);
+    if (rule == null) return Results.NotFound();
+    db.Alerts.Remove(rule);
+    await db.SaveChangesAsync();
+    Log.Information("Alert rule deleted: {Name}", rule.Name);
+    return Results.Ok();
+});
+
+// ── API: История сканирований ──
+
+app.MapGet("/api/history", async (HubDbContext db, int? instanceId, string? scannerName, DateTime? from, DateTime? to, int limit = 100) =>
+{
+    var query = db.ScanEvents.AsQueryable();
+    if (instanceId.HasValue) query = query.Where(e => e.InstanceId == instanceId.Value);
+    if (!string.IsNullOrWhiteSpace(scannerName)) query = query.Where(e => e.ScannerName == scannerName);
+    if (from.HasValue) query = query.Where(e => e.Timestamp >= from.Value);
+    if (to.HasValue) query = query.Where(e => e.Timestamp <= to.Value);
+    var events = await query.OrderByDescending(e => e.Timestamp).Take(Math.Clamp(limit, 1, 1000)).ToListAsync();
+    return Results.Ok(events);
+});
+
+app.MapGet("/api/history/stats", async (HubDbContext db) =>
+{
+    var totalScans = await db.ScanEvents.CountAsync();
+    var todayScans = await db.ScanEvents.CountAsync(e => e.Timestamp >= DateTime.UtcNow.Date);
+    var topScanners = await db.ScanEvents
+        .GroupBy(e => e.ScannerName)
+        .Select(g => new { Scanner = g.Key, Count = g.Count() })
+        .OrderByDescending(x => x.Count)
+        .Take(10)
+        .ToListAsync();
+    var hourlyScans = await db.ScanEvents
+        .Where(e => e.Timestamp >= DateTime.UtcNow.AddHours(24))
+        .GroupBy(e => e.Timestamp.Hour)
+        .Select(g => new { Hour = g.Key, Count = g.Count() })
+        .OrderBy(x => x.Hour)
+        .ToListAsync();
+    return Results.Ok(new { totalScans, todayScans, topScanners, hourlyScans });
+});
+
+app.MapDelete("/api/history", async (HubDbContext db) =>
+{
+    await db.ScanEvents.ExecuteDeleteAsync();
+    await db.SaveChangesAsync();
+    Log.Information("Scan history cleared");
+    return Results.Ok(new { message = "История очищена" });
 });
 
 // ── Статические файлы ──

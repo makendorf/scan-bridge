@@ -14,6 +14,16 @@ public class HubDbContext : DbContext
     /// </summary>
     public DbSet<RemoteInstance> Instances => Set<RemoteInstance>();
 
+    /// <summary>
+    /// Таблица правил алертов.
+    /// </summary>
+    public DbSet<AlertRule> Alerts => Set<AlertRule>();
+
+    /// <summary>
+    /// Таблица событий сканирования.
+    /// </summary>
+    public DbSet<ScanEvent> ScanEvents => Set<ScanEvent>();
+
     private readonly string? _connectionString;
 
     /// <summary>
@@ -60,5 +70,21 @@ public class HubDbContext : DbContext
         modelBuilder.Entity<RemoteInstance>().HasKey(e => e.Id);
         modelBuilder.Entity<RemoteInstance>().Property(e => e.Name).HasMaxLength(200);
         modelBuilder.Entity<RemoteInstance>().Property(e => e.Host).HasMaxLength(500);
+
+        modelBuilder.Entity<AlertRule>().HasKey(e => e.Id);
+        modelBuilder.Entity<AlertRule>().Property(e => e.Name).HasMaxLength(200);
+        modelBuilder.Entity<AlertRule>().Property(e => e.Type).HasMaxLength(50);
+        modelBuilder.Entity<AlertRule>().Property(e => e.SettingsJson).HasMaxLength(4000);
+
+        modelBuilder.Entity<ScanEvent>().HasKey(e => e.Id);
+        modelBuilder.Entity<ScanEvent>().Property(e => e.InstanceName).HasMaxLength(200);
+        modelBuilder.Entity<ScanEvent>().Property(e => e.ScannerName).HasMaxLength(100);
+        modelBuilder.Entity<ScanEvent>().Property(e => e.RawData).HasMaxLength(2000);
+        modelBuilder.Entity<ScanEvent>().Property(e => e.ParsedData).HasMaxLength(2000);
+        modelBuilder.Entity<ScanEvent>().Property(e => e.Format).HasMaxLength(50);
+        modelBuilder.Entity<ScanEvent>().Property(e => e.ContentType).HasMaxLength(50);
+        modelBuilder.Entity<ScanEvent>().HasIndex(e => e.Timestamp);
+        modelBuilder.Entity<ScanEvent>().HasIndex(e => e.InstanceId);
+        modelBuilder.Entity<ScanEvent>().HasIndex(e => e.ScannerName);
     }
 }

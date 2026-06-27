@@ -10,6 +10,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fira+Sans:wght@300;400;500;600;700&display=swap');
     </style>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
     <style>
         :root {
             --color-primary: #3D5A80;
@@ -714,7 +715,7 @@
         let instances = [];
         let hubStats = null;
         let selectedInstanceId = null;
-        let pollTimer = null;
+        let signalRConnection = null;
         let lastRenderedLogCount = 0;
         let logUserScrolledUp = false;
         const ACTION_TYPES = {
@@ -725,6 +726,49 @@
         };
 
         lucide.createIcons();
+
+        /* ── SignalR Connection ── */
+        async function startSignalR() {
+            signalRConnection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/stats")
+                .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+                .configureLogging(signalR.LogLevel.Warning)
+                .build();
+
+            signalRConnection.on("StatsUpdate", (stats) => {
+                hubStats = stats;
+                renderDashboard();
+                renderSidebarServers();
+                updateSidebarStats();
+                if (selectedInstanceId !== null) loadServerDetail(selectedInstanceId);
+            });
+
+            signalRConnection.onreconnecting(() => {
+                document.querySelector('.status-dot').style.background = 'var(--color-warning)';
+                document.querySelector('.header-status span:last-child').textContent = 'Переподключение...';
+            });
+
+            signalRConnection.onreconnected(() => {
+                document.querySelector('.status-dot').style.background = 'var(--color-success)';
+                document.querySelector('.header-status span:last-child').textContent = 'Онлайн';
+            });
+
+            signalRConnection.onclose(() => {
+                document.querySelector('.status-dot').style.background = 'var(--color-danger)';
+                document.querySelector('.header-status span:last-child').textContent = 'Оффлайн';
+            });
+
+            try {
+                await signalRConnection.start();
+                document.querySelector('.status-dot').style.background = 'var(--color-success)';
+                document.querySelector('.header-status span:last-child').textContent = 'Онлайн';
+            } catch (err) {
+                console.error('SignalR connection failed:', err);
+                document.querySelector('.status-dot').style.background = 'var(--color-danger)';
+                document.querySelector('.header-status span:last-child').textContent = 'Ошибка';
+                setTimeout(startSignalR, 5000);
+            }
+        }
 
         /* ── Navigation ── */
         function switchPanel(name) {
@@ -832,6 +876,37 @@
             await loadServerDetail(id);
         }
 
+        async function restartScanner(name) {
+            if (!selectedInstanceId) return;
+            if (!confirm(`Перезапустить сканер «${name}»?`)) return;
+            try {
+                const res = await fetch(`/api/instances/${selectedInstanceId}/scanners/${encodeURIComponent(name)}/restart`, { method: 'POST' });
+                if (res.ok) {
+                    toast(`Сканер «${name}» перезапущен`);
+                    setTimeout(() => loadServerDetail(selectedInstanceId), 1000);
+                } else {
+                    const err = await res.json();
+                    toast(err.error || 'Ошибка перезапуска', true);
+                }
+            } catch (e) { toast('Сервер недоступен', true); }
+        }
+
+        async function removeScanner(name) {
+            if (!selectedInstanceId) return;
+            if (!confirm(`Удалить сканер «${name}»?`)) return;
+            try {
+                const scanners = hubStats?.instances?.find(i => i.id === selectedInstanceId);
+                const res = await fetch(`/api/instances/${selectedInstanceId}/scanners/0`, { method: 'DELETE' });
+                if (res.ok) {
+                    toast(`Сканер «${name}» удалён`);
+                    setTimeout(() => loadServerDetail(selectedInstanceId), 1000);
+                } else {
+                    const err = await res.json();
+                    toast(err.error || 'Ошибка удаления', true);
+                }
+            } catch (e) { toast('Сервер недоступен', true); }
+        }
+
         async function loadServerDetail(id) {
             try {
                 const res = await fetch(`/api/instances/${id}/status`);
@@ -865,12 +940,22 @@
                 const status = s.running
                     ? '<span class="badge badge-green">Работает</span>'
                     : '<span class="badge badge-red">Остановлен</span>';
+                const name = s.name || '—';
                 return `<tr>
-                    <td><strong>${esc(s.name || '—')}</strong></td>
+                    <td><strong>${esc(name)}</strong></td>
                     <td><span class="badge">${esc(s.portName || '—')}</span></td>
                     <td>${status}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-secondary" onclick="restartScanner('${esc(name)}')" title="Перезапустить">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                        <button class="btn btn-sm btn-ghost danger" onclick="removeScanner('${esc(name)}')" title="Удалить">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </td>
                 </tr>`;
             }).join('');
+            lucide.createIcons();
         }
 
         function renderServerActions(actions) {
@@ -1041,7 +1126,7 @@
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ intervalMs: ms })
             });
-            if (res.ok) { toast('Интервал опроса обновлён'); startPolling(); }
+            if (res.ok) { toast('Интервал опроса обновлён'); }
             else { toast('Ошибка сохранения', true); }
         }
 
@@ -1070,15 +1155,8 @@
         function toggleTheme() { applyTheme(getTheme() === 'dark' ? 'light' : 'dark'); }
         applyTheme(getTheme());
 
-        /* ── Polling ── */
-        function startPolling() {
-            if (pollTimer) clearInterval(pollTimer);
-            const interval = (hubStats?.pollInterval || 5000);
-            pollTimer = setInterval(loadStats, interval);
-        }
-
         /* ── Init ── */
-        loadStats().then(() => startPolling());
+        loadStats().then(() => startSignalR());
     </script>
 </body>
 </html>
