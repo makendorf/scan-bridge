@@ -1,0 +1,156 @@
+/* ── Dashboard-specific styles ── */
+
+/* Extended KPI grid: 6 cards */
+.dashboard-kpi {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+@media (max-width: 1400px) {
+    .dashboard-kpi { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+    .dashboard-kpi { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Additional KPI icon color variants */
+.kpi-icon.purple { background: rgba(139, 92, 246, 0.15); color: #8B5CF6; }
+
+/* Charts row layout */
+.dashboard-charts {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+@media (max-width: 900px) {
+    .dashboard-charts { grid-template-columns: 1fr; }
+}
+
+.dashboard-chart-card { margin-bottom: 0; }
+.dashboard-chart-narrow { display: flex; flex-direction: column; }
+
+.chart-wrapper {
+    position: relative;
+    height: 260px;
+}
+
+/* Period selector buttons */
+.dashboard-period-btns {
+    display: flex;
+    gap: 4px;
+}
+.dashboard-period-btns .btn {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+.dashboard-period-btns .btn.active {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* Per-scanner grid */
+.dashboard-scanner-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.dashboard-scanner-card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+}
+
+.dashboard-scanner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.dashboard-scanner-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.dashboard-scanner-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.dashboard-scanner-stat {
+    text-align: center;
+}
+
+.dashboard-scanner-stat-label {
+    display: block;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
+}
+
+.dashboard-scanner-stat-value {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+    font-family: 'Fira Code', monospace;
+}
+
+.dashboard-scanner-last {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+}
+
+/* Reconnect errors */
+.dashboard-reconnects {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.dashboard-reconnect-item {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+.dashboard-reconnect-item:last-child { border-bottom: none; }
+
+.dashboard-reconnect-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.dashboard-reconnect-time {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-family: 'Fira Code', monospace;
+}
+
+.dashboard-reconnect-msg {
+    font-size: 13px;
+    color: var(--color-text-dim);
+    margin-bottom: 4px;
+    word-break: break-word;
+}
+
+.dashboard-reconnect-attempt {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+/* Refresh hint */
+.dashboard-refresh-hint {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}

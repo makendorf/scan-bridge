@@ -16,6 +16,7 @@ public class SerialPortService : BackgroundService
     private readonly SerialPortConfig _config;
     private readonly IBarcodeParser _parser;
     private readonly ScanProcessorService _processor;
+    private readonly ScanHistoryService _historyService;
     private readonly ReconnectConfig _reconnect;
     private SerialPort? _serialPort;
 
@@ -32,12 +33,14 @@ public class SerialPortService : BackgroundService
         SerialPortConfig config,
         IBarcodeParser parser,
         ScanProcessorService processor,
+        ScanHistoryService historyService,
         ReconnectConfig? reconnect = null)
     {
         _logger = logger;
         _config = config;
         _parser = parser;
         _processor = processor;
+        _historyService = historyService;
         _reconnect = reconnect ?? new ReconnectConfig();
     }
 
@@ -96,6 +99,7 @@ public class SerialPortService : BackgroundService
             {
                 if (stoppingToken.IsCancellationRequested) break;
                 retryCount++;
+                _historyService.RecordReconnect(_config.Name, ex.Message, retryCount);
                 _logger.LogError(ex, "[{Scanner}] Ошибка COM-порта (попытка {Retry}), переподключение через {Delay} сек...",
                     _config.Name, retryCount, retryDelay / 1000);
                 LogAvailablePorts();

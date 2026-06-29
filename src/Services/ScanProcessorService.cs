@@ -10,6 +10,7 @@ public class ScanProcessorService
 {
     private readonly PostScanManager _postScanManager;
     private readonly ScanTracker _scanTracker;
+    private readonly ScanHistoryService _historyService;
     private readonly ILogger<ScanProcessorService> _logger;
 
     /// <summary>
@@ -17,11 +18,13 @@ public class ScanProcessorService
     /// </summary>
     /// <param name="postScanManager">Менеджер пост-скан действий.</param>
     /// <param name="scanTracker">Трекер времени последнего сканирования.</param>
+    /// <param name="historyService">Сервис истории сканирований.</param>
     /// <param name="logger">Логгер.</param>
-    public ScanProcessorService(PostScanManager postScanManager, ScanTracker scanTracker, ILogger<ScanProcessorService> logger)
+    public ScanProcessorService(PostScanManager postScanManager, ScanTracker scanTracker, ScanHistoryService historyService, ILogger<ScanProcessorService> logger)
     {
         _postScanManager = postScanManager;
         _scanTracker = scanTracker;
+        _historyService = historyService;
         _logger = logger;
     }
 
@@ -40,6 +43,7 @@ public class ScanProcessorService
         }
 
         _scanTracker.RecordScan(scan.ScannerName);
+        _historyService.RecordScan(scan);
 
         await _postScanManager.ExecuteAllAsync(scan, ct);
     }

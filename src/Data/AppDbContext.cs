@@ -40,6 +40,16 @@ public class AppDbContext : DbContext
     public DbSet<LogRecord> Logs => Set<LogRecord>();
 
     /// <summary>
+    /// Таблица истории сканирований.
+    /// </summary>
+    public DbSet<ScanHistory> ScanHistory => Set<ScanHistory>();
+
+    /// <summary>
+    /// Таблица событий переподключения сканеров.
+    /// </summary>
+    public DbSet<ReconnectEvent> ReconnectEvents => Set<ReconnectEvent>();
+
+    /// <summary>
     /// Создаёт экземпляр контекста базы данных.
     /// </summary>
     /// <param name="options">Параметры подключения к БД.</param>
@@ -92,6 +102,26 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.Level);
             e.Property(x => x.Level).HasMaxLength(10);
             e.Property(x => x.Message).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<ScanHistory>(e =>
+        {
+            e.HasIndex(x => x.Timestamp);
+            e.HasIndex(x => x.ScannerName);
+            e.HasIndex(x => x.Format);
+            e.Property(x => x.ScannerName).HasMaxLength(100);
+            e.Property(x => x.Format).HasMaxLength(20);
+            e.Property(x => x.RawData).HasMaxLength(500);
+            e.Property(x => x.ParsedData).HasMaxLength(500);
+            e.Property(x => x.ContentType).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<ReconnectEvent>(e =>
+        {
+            e.HasIndex(x => x.Timestamp);
+            e.HasIndex(x => x.ScannerName);
+            e.Property(x => x.ScannerName).HasMaxLength(100);
+            e.Property(x => x.ErrorMessage).HasMaxLength(500);
         });
     }
 }

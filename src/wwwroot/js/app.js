@@ -15,10 +15,11 @@ function switchPanel(name) {
     document.querySelector(`.sidebar-link[data-panel="${name}"]`).classList.add('active');
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
-    if (name === 'logs') { loadLogs(); startLogPolling(); }
+    if (name === 'logs') { loadLogs(); startLogPolling(); stopDashPolling(); }
     else { stopLogPolling(); }
-    if (name === 'actions') loadGroups();
-    if (name === 'scanners') { load(); loadSettings(); }
+    if (name === 'actions') { loadGroups(); stopDashPolling(); }
+    if (name === 'scanners') { load(); loadSettings(); stopDashPolling(); }
+    if (name === 'dashboard') { loadDashboard(); startDashPolling(); }
     closeSidebar();
 }
 

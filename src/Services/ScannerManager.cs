@@ -74,7 +74,7 @@ public class ScannerManager : IDisposable
             var service = _serviceFactory(config, config.Reconnect);
 
             var task = Task.Run(() => service.StartAsync(cts.Token));
-            _instances[config.Name] = new ScannerInstance(config, cts, service, task);
+            _instances[config.Name] = new ScannerInstance(config, cts, service, task, DateTime.UtcNow);
 
             _logger.LogInformation("[{Scanner}] Запущен на порту {Port}", config.Name, config.PortName);
         }
@@ -216,6 +216,18 @@ public class ScannerManager : IDisposable
     public List<string> GetRunning() { lock (_lock) return [.. _instances.Keys]; }
 
     /// <summary>
+    /// Возвращает время работы каждого запущенного сканера.
+    /// </summary>
+    /// <returns>Словарь: имя сканера → время работы.</returns>
+    public Dictionary<string, TimeSpan> GetUptime()
+    {
+        lock (_lock)
+        {
+            return _instances.ToDictionary(kv => kv.Key, kv => DateTime.UtcNow - kv.Value.StartedAt);
+        }
+    }
+
+    /// <summary>
     /// Останавливает все сканеры и освобождает ресурсы.
     /// </summary>
     public void Dispose()
@@ -228,4 +240,4 @@ public class ScannerManager : IDisposable
 /// <summary>
 /// Внутренняя запись, хранящая экземпляр сканера с его конфигурацией и управляющими объектами.
 /// </summary>
-internal record ScannerInstance(SerialPortConfig Config, CancellationTokenSource Cts, SerialPortService Service, Task Task);
+internal record ScannerInstance(SerialPortConfig Config, CancellationTokenSource Cts, SerialPortService Service, Task Task, DateTime StartedAt);

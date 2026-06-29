@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ScanBridge.Models;
@@ -31,7 +32,13 @@ public class ScannerManagerTests : IDisposable
                         new Mock<IPostScanActionFactory>().Object,
                         new Mock<ILogger<PostScanManager>>().Object).Object,
                     new ScanTracker(),
-                    new Mock<ILogger<ScanProcessorService>>().Object).Object)
+                    new ScanHistoryService(
+                        new Mock<IServiceScopeFactory>().Object,
+                        new Mock<ILogger<ScanHistoryService>>().Object),
+                    new Mock<ILogger<ScanProcessorService>>().Object).Object,
+                new ScanHistoryService(
+                    new Mock<IServiceScopeFactory>().Object,
+                    new Mock<ILogger<ScanHistoryService>>().Object))
         { }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken) => Task.CompletedTask;

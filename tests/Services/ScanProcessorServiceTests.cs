@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ScanBridge.Models;
@@ -18,7 +19,10 @@ public class ScanProcessorServiceTests
             new Mock<IPostScanActionFactory>().Object,
             new Mock<ILogger<PostScanManager>>().Object);
         _scanTracker = new ScanTracker();
-        _processor = new ScanProcessorService(_postScanMock.Object, _scanTracker, _loggerMock.Object);
+        var historyService = new ScanHistoryService(
+            new Mock<IServiceScopeFactory>().Object,
+            new Mock<ILogger<ScanHistoryService>>().Object);
+        _processor = new ScanProcessorService(_postScanMock.Object, _scanTracker, historyService, _loggerMock.Object);
     }
 
     [Fact]

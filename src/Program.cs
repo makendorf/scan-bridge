@@ -30,10 +30,12 @@ builder.Services.AddSingleton<Func<SerialPortConfig, ReconnectConfig?, SerialPor
         config,
         sp.GetRequiredService<IBarcodeParser>(),
         sp.GetRequiredService<ScanProcessorService>(),
+        sp.GetRequiredService<ScanHistoryService>(),
         reconnect);
 });
 builder.Services.AddSingleton<ScannerManager>();
 builder.Services.AddSingleton<ScanTracker>();
+builder.Services.AddSingleton<ScanHistoryService>();
 
 if (OperatingSystem.IsWindows())
 {
@@ -65,6 +67,8 @@ using (var scope = app.Services.CreateScope())
         db.Database.EnsureCreated();
     }
     SeedFromLegacyConfig(db);
+    var historyService = app.Services.GetRequiredService<ScanHistoryService>();
+    await historyService.CleanupOldRecordsAsync();
 }
 
 var postScanManager = app.Services.GetRequiredService<PostScanManager>();
@@ -113,6 +117,7 @@ app.MapLogEndpoints();
 app.MapPortEndpoints();
 app.MapPostScanEndpoints(postScanManager);
 app.MapSettingsEndpoints(manager, ReadScanners);
+app.MapDashboardEndpoints(manager);
 
 using (var scope = app.Services.CreateScope())
 {
