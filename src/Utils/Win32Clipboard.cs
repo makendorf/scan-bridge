@@ -4,8 +4,8 @@ namespace ScanBridge.Utils;
 
 internal static class Win32Clipboard
 {
-    [DllImport("user32.dll")]
-    internal static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -25,14 +25,10 @@ internal static class Win32Clipboard
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint SendInput(uint nInputs, IntPtr pInputs, int cbSize);
-
-    private const byte VK_CONTROL = 0x11;
-    private const byte VK_V = 0x56;
-    private const uint KEYEVENTF_KEYUP = 0x0002;
     private const uint CF_UNICODETEXT = 13;
     private const uint INPUT_KEYBOARD = 1;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
     private const uint KEYEVENTF_UNICODE = 0x0004;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -45,7 +41,20 @@ internal static class Win32Clipboard
     [StructLayout(LayoutKind.Explicit)]
     private struct INPUTUNION
     {
+        [FieldOffset(0)] public MOUSEINPUT mi;
         [FieldOffset(0)] public KEYBDINPUT ki;
+        [FieldOffset(0)] public HARDWAREINPUT hi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -56,6 +65,14 @@ internal static class Win32Clipboard
         public uint dwFlags;
         public uint time;
         public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HARDWAREINPUT
+    {
+        public uint uMsg;
+        public ushort wParamL;
+        public ushort wParamH;
     }
 
     internal static void SetClipboardText(string text)
@@ -98,56 +115,86 @@ internal static class Win32Clipboard
 
     internal static void SimulatePaste()
     {
-        keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
-        keybd_event(VK_V, 0, 0, UIntPtr.Zero);
-        keybd_event(VK_V, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+        var inputs = new INPUT[4];
+        inputs[0] = CreateKeyInput(0x11, KEYEVENTF_EXTENDEDKEY);
+        inputs[1] = CreateKeyInput(0x56, 0);
+        inputs[2] = CreateKeyInput(0x56, KEYEVENTF_KEYUP);
+        inputs[3] = CreateKeyInput(0x11, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP);
+        SendInput(4, inputs, Marshal.SizeOf<INPUT>());
+        Thread.Sleep(50);
     }
 
-    internal static void SimulateTyping(string text, int delayMs = 10)
+    internal static void SimulateTyping(string text)
     {
+        if (string.IsNullOrEmpty(text)) return;
+
         var prevWindow = GetForegroundWindow();
 
-        var size = Marshal.SizeOf<INPUT>();
-        var hInput = Marshal.AllocHGlobal(size * 2);
-
-        try
+        var inputs = new INPUT[text.Length * 2];
+        for (var i = 0; i < text.Length; i++)
         {
-            for (var i = 0; i < text.Length; i++)
+            var ch = text[i];
+            inputs[i * 2] = new INPUT
             {
-                var ch = text[i];
-
-                var down = new INPUT
+                type = INPUT_KEYBOARD,
+                u = new INPUTUNION
                 {
-                    type = INPUT_KEYBOARD,
-                    u = new INPUTUNION
+                    ki = new KEYBDINPUT
                     {
-                        ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE }
+                        wVk = 0,
+                        wScan = ch,
+                        dwFlags = KEYEVENTF_UNICODE,
+                        time = 0,
+                        dwExtraInfo = IntPtr.Zero
                     }
-                };
-                var up = new INPUT
+                }
+            };
+            inputs[i * 2 + 1] = new INPUT
+            {
+                type = INPUT_KEYBOARD,
+                u = new INPUTUNION
                 {
-                    type = INPUT_KEYBOARD,
-                    u = new INPUTUNION
+                    ki = new KEYBDINPUT
                     {
-                        ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP }
+                        wVk = 0,
+                        wScan = ch,
+                        dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
+                        time = 0,
+                        dwExtraInfo = IntPtr.Zero
                     }
-                };
-
-                Marshal.StructureToPtr(down, hInput, false);
-                Marshal.StructureToPtr(up, hInput + size, false);
-                SendInput(2, hInput, size);
-
-                if (delayMs > 0 && i + 1 < text.Length)
-                    Thread.Sleep(delayMs);
-            }
+                }
+            };
         }
-        finally
+
+        var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        if (sent == 0)
         {
-            Marshal.FreeHGlobal(hInput);
+            var error = Marshal.GetLastWin32Error();
+            throw new InvalidOperationException($"SendInput failed with error code: {error}");
         }
+
+        Thread.Sleep(50);
 
         if (prevWindow != IntPtr.Zero)
             SetForegroundWindow(prevWindow);
+    }
+
+    private static INPUT CreateKeyInput(byte vk, uint flags)
+    {
+        return new INPUT
+        {
+            type = INPUT_KEYBOARD,
+            u = new INPUTUNION
+            {
+                ki = new KEYBDINPUT
+                {
+                    wVk = vk,
+                    wScan = 0,
+                    dwFlags = flags,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            }
+        };
     }
 }
