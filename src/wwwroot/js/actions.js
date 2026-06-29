@@ -20,8 +20,7 @@ const ACTION_TYPES = {
         name: 'Вставка в активное окно',
         description: 'Вставляет данные сканирования в текущее активное окно через буфер обмена (эмуляция Ctrl+V). Работает только на Windows.',
         settings: [
-            { key: 'AppendNewline', label: 'Добавить перенос строки', type: 'select', options: ['false', 'true'], default: 'false' },
-            { key: 'DelayMs', label: 'Задержка перед вставкой (мс)', type: 'number', default: '50' }
+            { key: 'AppendNewline', label: 'Добавить перенос строки', type: 'select', options: ['false', 'true'], default: 'false' }
         ]
     },
     WindowPaste: {
@@ -32,8 +31,7 @@ const ACTION_TYPES = {
               hint: 'Часть заголовка окна (регистр не важен). Например: «Notepad», «Excel», «1С»' },
             { key: 'ActivationDelay', label: 'Задержка после активации (мс)', type: 'number', default: '200',
               hint: 'Время ожидания после активации окна перед вставкой. Увеличьте, если окно не успевает открыться.' },
-            { key: 'AppendNewline', label: 'Добавить перенос строки', type: 'select', options: ['false', 'true'], default: 'false' },
-            { key: 'DelayMs', label: 'Задержка перед вставкой (мс)', type: 'number', default: '50' }
+            { key: 'AppendNewline', label: 'Добавить перенос строки', type: 'select', options: ['false', 'true'], default: 'false' }
         ]
     },
     Export: {

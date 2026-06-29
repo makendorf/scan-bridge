@@ -17,22 +17,18 @@ public class ClipboardPasteAction : IPostScanAction
 
     private readonly ILogger<ClipboardPasteAction> _logger;
     private readonly bool _appendNewline;
-    private readonly int _delayMs;
 
     /// <summary>
     /// Создаёт экземпляр действия вставки в буфер обмена.
     /// </summary>
     /// <param name="logger">Логгер.</param>
-    /// <param name="settings">Параметры: AppendNewline (добавлять перенос строки), DelayMs (задержка в мс).</param>
+    /// <param name="settings">Параметры: AppendNewline (добавлять перенос строки).</param>
     public ClipboardPasteAction(ILogger<ClipboardPasteAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
 
         _appendNewline = settings.TryGetValue("AppendNewline", out var val)
             && bool.TryParse(val, out var b) && b;
-
-        _delayMs = settings.TryGetValue("DelayMs", out var delayStr)
-            && int.TryParse(delayStr, out var d) ? d : 50;
     }
 
     /// <summary>
@@ -60,11 +56,11 @@ public class ClipboardPasteAction : IPostScanAction
 
             Win32Clipboard.SetClipboardText(text);
 
-            await Task.Delay(_delayMs, ct);
+            await Task.Delay(50, ct);
 
             Win32Clipboard.SimulatePaste();
 
-            await Task.Delay(_delayMs, ct);
+            await Task.Delay(50, ct);
 
             if (prevWindow != IntPtr.Zero)
                 Win32Clipboard.SetForegroundWindow(prevWindow);

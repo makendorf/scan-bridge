@@ -19,7 +19,6 @@ public class WindowPasteAction : IPostScanAction
     private readonly ILogger<WindowPasteAction> _logger;
     private readonly string _windowTitle;
     private readonly bool _appendNewline;
-    private readonly int _delayMs;
     private readonly int _activationDelay;
 
     [DllImport("user32.dll")]
@@ -55,7 +54,7 @@ public class WindowPasteAction : IPostScanAction
     /// Создаёт экземпляр действия вставки в выбранное окно.
     /// </summary>
     /// <param name="logger">Логгер.</param>
-    /// <param name="settings">Параметры: WindowTitle (заголовок окна), AppendNewline, DelayMs.</param>
+    /// <param name="settings">Параметры: WindowTitle (заголовок окна), AppendNewline, ActivationDelay.</param>
     public WindowPasteAction(ILogger<WindowPasteAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
@@ -63,8 +62,6 @@ public class WindowPasteAction : IPostScanAction
         _windowTitle = settings.TryGetValue("WindowTitle", out var title) ? title : "";
         _appendNewline = settings.TryGetValue("AppendNewline", out var val)
             && bool.TryParse(val, out var b) && b;
-        _delayMs = settings.TryGetValue("DelayMs", out var delayStr)
-            && int.TryParse(delayStr, out var d) ? d : 50;
         _activationDelay = settings.TryGetValue("ActivationDelay", out var actStr)
             && int.TryParse(actStr, out var ad) ? ad : 200;
 
@@ -107,10 +104,10 @@ public class WindowPasteAction : IPostScanAction
                 text += Environment.NewLine;
 
             Win32Clipboard.SetClipboardText(text);
-            await Task.Delay(_delayMs, ct);
+            await Task.Delay(50, ct);
 
             Win32Clipboard.SimulatePaste();
-            await Task.Delay(_delayMs, ct);
+            await Task.Delay(50, ct);
 
             if (prevWindow != IntPtr.Zero && prevWindow != targetHwnd)
                 Win32Clipboard.SetForegroundWindow(prevWindow);
