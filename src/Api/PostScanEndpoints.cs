@@ -40,6 +40,7 @@ public static class PostScanEndpoints
                         })
                         .ToList()
                 })
+                .AsSplitQuery()
                 .ToList();
 
             var enabled = postScanManager.GetEnabledActions();
@@ -113,6 +114,7 @@ public static class PostScanEndpoints
                         })
                         .ToList()
                 })
+                .AsSplitQuery()
                 .ToList();
 
             postScanManager.Configure(finalConfigs);

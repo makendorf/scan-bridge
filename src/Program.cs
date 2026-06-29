@@ -97,6 +97,7 @@ using (var scope = app.Services.CreateScope())
                 })
                 .ToList()
         })
+        .AsSplitQuery()
         .ToList();
     postScanManager.Configure(groupConfigs);
 }
