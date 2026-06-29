@@ -35,6 +35,29 @@ internal static class Win32Clipboard
     private const uint INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_UNICODE = 0x0004;
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INPUT
+    {
+        public uint type;
+        public INPUTUNION u;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct INPUTUNION
+    {
+        [FieldOffset(0)] public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
     internal static void SetClipboardText(string text)
     {
         var opened = false;
@@ -83,38 +106,51 @@ internal static class Win32Clipboard
 
     internal static void SimulateTyping(string text, int delayMs = 10)
     {
-        const int INPUT_SIZE = 40;
+        var prevWindow = GetForegroundWindow();
 
-        var inputSize = Marshal.SizeOf<UIntPtr>() == 8 ? INPUT_SIZE : 28;
-
-        for (var i = 0; i < text.Length; i++)
+        foreach (var ch in text)
         {
-            var ch = text[i];
-            var hInput = Marshal.AllocHGlobal(inputSize);
-
-            try
+            if (ch <= 127)
             {
-                Marshal.WriteInt32(hInput, 0, (int)INPUT_KEYBOARD);
-
-                var kiOffset = Marshal.SizeOf<uint>();
-                Marshal.WriteInt16(hInput, kiOffset, 0);
-                Marshal.WriteInt16(hInput, kiOffset + 2, (short)ch);
-                Marshal.WriteInt32(hInput, kiOffset + 4, (int)KEYEVENTF_UNICODE);
-                Marshal.WriteInt32(hInput, kiOffset + 8, 0);
-                Marshal.WriteInt64(hInput, kiOffset + 12, 0);
-
-                SendInput(1, hInput, inputSize);
-
-                Marshal.WriteInt32(hInput, kiOffset + 4, (int)(KEYEVENTF_UNICODE | KEYEVENTF_KEYUP));
-                SendInput(1, hInput, inputSize);
+                var vk = (byte)ch;
+                if (ch >= 'a' && ch <= 'z')
+                    vk = (byte)(ch - 'a' + 'A');
+                keybd_event(vk, 0, 0, UIntPtr.Zero);
+                keybd_event(vk, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
             }
-            finally
+            else
             {
-                Marshal.FreeHGlobal(hInput);
+                var inputs = new INPUT[2];
+                var size = Marshal.SizeOf<INPUT>();
+
+                inputs[0].type = INPUT_KEYBOARD;
+                inputs[0].u.ki.wVk = 0;
+                inputs[0].u.ki.wScan = (ushort)ch;
+                inputs[0].u.ki.dwFlags = KEYEVENTF_UNICODE;
+
+                inputs[1].type = INPUT_KEYBOARD;
+                inputs[1].u.ki.wVk = 0;
+                inputs[1].u.ki.wScan = (ushort)ch;
+                inputs[1].u.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
+
+                var hInput = Marshal.AllocHGlobal(size);
+                try
+                {
+                    for (var j = 0; j < inputs.Length; j++)
+                        Marshal.StructureToPtr(inputs[j], hInput + j * size, false);
+                    SendInput(2, hInput, size);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(hInput);
+                }
             }
 
-            if (delayMs > 0 && i + 1 < text.Length)
+            if (delayMs > 0)
                 Thread.Sleep(delayMs);
         }
+
+        if (prevWindow != IntPtr.Zero)
+            SetForegroundWindow(prevWindow);
     }
 }
