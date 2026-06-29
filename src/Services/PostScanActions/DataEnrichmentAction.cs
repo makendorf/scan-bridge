@@ -8,7 +8,7 @@ namespace ScanBridge.Services.PostScanActions;
 /// Действие обогащения данных сканирования.
 /// Отправляет данные на внешний API и сохраняет результат в Metadata.
 /// </summary>
-public class DataEnrichmentAction : IPostScanAction
+public class DataEnrichmentAction : IPostScanAction, IDisposable
 {
     public string Type => "DataEnrichment";
 
@@ -114,5 +114,10 @@ public class DataEnrichmentAction : IPostScanAction
         {
             _logger.LogWarning("DataEnrichment: ошибка парсинга заголовков JSON");
         }
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
     }
 }

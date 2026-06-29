@@ -382,7 +382,19 @@ public class ScanHistoryService
         {
             using var scope = _scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var dbPath = db.Database.GetConnectionString()?.Split('=').LastOrDefault() ?? "scanbridge.db";
+            var connectionString = db.Database.GetConnectionString() ?? "";
+            var dbPath = "scanbridge.db";
+
+            foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var kv = part.Split('=', 2);
+                if (kv.Length == 2 && kv[0].Trim().Equals("Data Source", StringComparison.OrdinalIgnoreCase))
+                {
+                    dbPath = kv[1].Trim();
+                    break;
+                }
+            }
+
             if (!Path.IsPathRooted(dbPath))
                 dbPath = Path.Combine(AppContext.BaseDirectory, dbPath);
             if (File.Exists(dbPath))

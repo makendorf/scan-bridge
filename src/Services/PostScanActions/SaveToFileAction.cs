@@ -19,6 +19,8 @@ public class ExportAction : IPostScanAction
     /// </summary>
     public string Type => "Export";
 
+    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+
     private readonly ILogger<ExportAction> _logger;
     private readonly string _format;
     private readonly string _filenameTemplate;
@@ -241,16 +243,15 @@ public class ExportAction : IPostScanAction
             return;
         }
 
-        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-
+        using var request = new HttpRequestMessage(HttpMethod.Post, _httpUrl);
         foreach (var header in _httpHeaders)
         {
-            if (!client.DefaultRequestHeaders.Contains(header.Key))
-                client.DefaultRequestHeaders.Add(header.Key, header.Value);
+            if (!request.Headers.Contains(header.Key))
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
-        var body = new StringContent(content, Encoding.UTF8, _httpContentType);
-        var response = await client.PostAsync(_httpUrl, body, ct);
+        request.Content = new StringContent(content, Encoding.UTF8, _httpContentType);
+        var response = await SharedHttpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
 
         _logger.LogInformation("Export HTTP: {Url} → {Status}", _httpUrl, (int)response.StatusCode);

@@ -14,7 +14,6 @@ public class PostScanManager
     private readonly IPostScanActionFactory _factory;
     private readonly ILogger<PostScanManager> _logger;
     private volatile IReadOnlyList<CompiledGroup> _groups = Array.Empty<CompiledGroup>();
-    private readonly object _lock = new();
 
     /// <summary>
     /// Создаёт экземпляр менеджера пост-скан действий.
@@ -65,10 +64,7 @@ public class PostScanManager
             }
         }
 
-        lock (_lock)
-        {
-            _groups = newGroups.AsReadOnly();
-        }
+        _groups = newGroups.AsReadOnly();
     }
 
     /// <summary>
@@ -98,14 +94,11 @@ public class PostScanManager
     /// <returns>Только для чтения список строк с типами действий.</returns>
     public virtual IReadOnlyList<string> GetEnabledActions()
     {
-        lock (_lock)
-        {
-            return _groups
-                .SelectMany(g => g.Actions)
-                .Select(a => a.Action.Type)
-                .ToList()
-                .AsReadOnly();
-        }
+        return _groups
+            .SelectMany(g => g.Actions)
+            .Select(a => a.Action.Type)
+            .ToList()
+            .AsReadOnly();
     }
 
     /// <summary>
