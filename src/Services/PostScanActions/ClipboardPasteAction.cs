@@ -4,8 +4,8 @@ using ScanBridge.Utils;
 namespace ScanBridge.Services.PostScanActions;
 
 /// <summary>
-/// Действие вставки результата сканирования в активное окно через буфер обмена.
-/// Использует Win32 API для эмуляции нажатия Ctrl+V.
+/// Действие вставки результата сканирования в активное окно.
+/// Поддерживает два режима: через буфер обмена (Ctrl+V) и эмуляцию клавиатуры.
 /// Работает только на Windows.
 /// </summary>
 public class ClipboardPasteAction : IPostScanAction
@@ -17,23 +17,25 @@ public class ClipboardPasteAction : IPostScanAction
 
     private readonly ILogger<ClipboardPasteAction> _logger;
     private readonly bool _appendNewline;
+    private readonly string _mode;
 
     /// <summary>
     /// Создаёт экземпляр действия вставки в буфер обмена.
     /// </summary>
     /// <param name="logger">Логгер.</param>
-    /// <param name="settings">Параметры: AppendNewline (добавлять перенос строки).</param>
+    /// <param name="settings">Параметры: AppendNewline, Mode (clipboard/keyboard).</param>
     public ClipboardPasteAction(ILogger<ClipboardPasteAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
 
         _appendNewline = settings.TryGetValue("AppendNewline", out var val)
             && bool.TryParse(val, out var b) && b;
+
+        _mode = (settings.TryGetValue("Mode", out var mode) ? mode : "clipboard").ToLowerInvariant();
     }
 
     /// <summary>
     /// Вставляет результат сканирования в активное окно.
-    /// Сохраняет предыдущее активное окно, вставляет текст и восстанавливает фокус.
     /// </summary>
     /// <param name="scan">Результат сканирования.</param>
     /// <param name="ct">Токен отмены.</param>
@@ -52,18 +54,22 @@ public class ClipboardPasteAction : IPostScanAction
             if (_appendNewline)
                 text += Environment.NewLine;
 
-            var prevWindow = Win32Clipboard.GetForegroundWindow();
+            if (_mode == "keyboard")
+            {
+                Win32Clipboard.SimulateTyping(text);
+            }
+            else
+            {
+                var prevWindow = Win32Clipboard.GetForegroundWindow();
 
-            Win32Clipboard.SetClipboardText(text);
+                Win32Clipboard.SetClipboardText(text);
+                await Task.Delay(50, ct);
+                Win32Clipboard.SimulatePaste();
+                await Task.Delay(50, ct);
 
-            await Task.Delay(50, ct);
-
-            Win32Clipboard.SimulatePaste();
-
-            await Task.Delay(50, ct);
-
-            if (prevWindow != IntPtr.Zero)
-                Win32Clipboard.SetForegroundWindow(prevWindow);
+                if (prevWindow != IntPtr.Zero)
+                    Win32Clipboard.SetForegroundWindow(prevWindow);
+            }
 
             _logger.LogInformation("Вставлено: {Data}", ControlCharDisplay.ForDisplay(text.TrimEnd()));
         }

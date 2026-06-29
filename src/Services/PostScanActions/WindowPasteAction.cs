@@ -20,6 +20,7 @@ public class WindowPasteAction : IPostScanAction
     private readonly string _windowTitle;
     private readonly bool _appendNewline;
     private readonly int _activationDelay;
+    private readonly string _mode;
 
     [DllImport("user32.dll")]
     private static extern bool BringWindowToTop(IntPtr hWnd);
@@ -54,7 +55,7 @@ public class WindowPasteAction : IPostScanAction
     /// Создаёт экземпляр действия вставки в выбранное окно.
     /// </summary>
     /// <param name="logger">Логгер.</param>
-    /// <param name="settings">Параметры: WindowTitle (заголовок окна), AppendNewline, ActivationDelay.</param>
+    /// <param name="settings">Параметры: WindowTitle, AppendNewline, ActivationDelay, Mode (clipboard/keyboard).</param>
     public WindowPasteAction(ILogger<WindowPasteAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
@@ -64,6 +65,7 @@ public class WindowPasteAction : IPostScanAction
             && bool.TryParse(val, out var b) && b;
         _activationDelay = settings.TryGetValue("ActivationDelay", out var actStr)
             && int.TryParse(actStr, out var ad) ? ad : 200;
+        _mode = (settings.TryGetValue("Mode", out var mode) ? mode : "clipboard").ToLowerInvariant();
 
         if (string.IsNullOrWhiteSpace(_windowTitle))
             _logger.LogWarning("WindowPaste: WindowTitle не задан, действие не будет выполняться");
@@ -103,11 +105,17 @@ public class WindowPasteAction : IPostScanAction
             if (_appendNewline)
                 text += Environment.NewLine;
 
-            Win32Clipboard.SetClipboardText(text);
-            await Task.Delay(50, ct);
-
-            Win32Clipboard.SimulatePaste();
-            await Task.Delay(50, ct);
+            if (_mode == "keyboard")
+            {
+                Win32Clipboard.SimulateTyping(text);
+            }
+            else
+            {
+                Win32Clipboard.SetClipboardText(text);
+                await Task.Delay(50, ct);
+                Win32Clipboard.SimulatePaste();
+                await Task.Delay(50, ct);
+            }
 
             if (prevWindow != IntPtr.Zero && prevWindow != targetHwnd)
                 Win32Clipboard.SetForegroundWindow(prevWindow);

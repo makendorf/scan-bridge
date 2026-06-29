@@ -18,17 +18,25 @@ const ACTION_TYPES = {
     },
     ClipboardPaste: {
         name: 'Вставка в активное окно',
-        description: 'Вставляет данные сканирования в текущее активное окно через буфер обмена (эмуляция Ctrl+V). Работает только на Windows.',
+        description: 'Вставляет данные сканирования в текущее активное окно. Работает только на Windows.',
         settings: [
+            { key: 'Mode', label: 'Режим вставки', type: 'select',
+              options: ['clipboard', 'keyboard'], default: 'clipboard',
+              optionLabels: { clipboard: 'Ctrl+V (буфер обмена)', keyboard: 'Клавиатура (печать)' },
+              hint: 'Ctrl+V — быстрый способ через буфер обмена.\nКлавиатура — эмулирует посимвольный ввод, как будто текст печатают с клавиатуры.' },
             { key: 'AppendNewline', label: 'Добавить перенос строки', type: 'select', options: ['false', 'true'], default: 'false' }
         ]
     },
     WindowPaste: {
         name: 'Вставка в выбранное окно',
-        description: 'Находит окно по заголовку, активирует его и вставляет данные через буфер обмена. Заголовок может быть частью названия окна.',
+        description: 'Находит окно по заголовку, активирует его и вставляет данные. Работает только на Windows.',
         settings: [
             { key: 'WindowTitle', label: 'Заголовок окна', type: 'text', default: '',
               hint: 'Часть заголовка окна (регистр не важен). Например: «Notepad», «Excel», «1С»' },
+            { key: 'Mode', label: 'Режим вставки', type: 'select',
+              options: ['clipboard', 'keyboard'], default: 'clipboard',
+              optionLabels: { clipboard: 'Ctrl+V (буфер обмена)', keyboard: 'Клавиатура (печать)' },
+              hint: 'Ctrl+V — быстрый способ через буфер обмена.\nКлавиатура — эмулирует посимвольный ввод.' },
             { key: 'ActivationDelay', label: 'Задержка после активации (мс)', type: 'number', default: '200',
               hint: 'Время ожидания после активации окна перед вставкой. Увеличьте, если окно не успевает открыться.' },
             { key: 'AppendNewline', label: 'Добавить перенос строки', type: 'select', options: ['false', 'true'], default: 'false' }
