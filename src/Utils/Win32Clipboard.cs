@@ -108,46 +108,43 @@ internal static class Win32Clipboard
     {
         var prevWindow = GetForegroundWindow();
 
-        foreach (var ch in text)
+        var size = Marshal.SizeOf<INPUT>();
+        var hInput = Marshal.AllocHGlobal(size * 2);
+
+        try
         {
-            if (ch <= 127)
+            for (var i = 0; i < text.Length; i++)
             {
-                var vk = (byte)ch;
-                if (ch >= 'a' && ch <= 'z')
-                    vk = (byte)(ch - 'a' + 'A');
-                keybd_event(vk, 0, 0, UIntPtr.Zero);
-                keybd_event(vk, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
-            }
-            else
-            {
-                var inputs = new INPUT[2];
-                var size = Marshal.SizeOf<INPUT>();
+                var ch = text[i];
 
-                inputs[0].type = INPUT_KEYBOARD;
-                inputs[0].u.ki.wVk = 0;
-                inputs[0].u.ki.wScan = (ushort)ch;
-                inputs[0].u.ki.dwFlags = KEYEVENTF_UNICODE;
-
-                inputs[1].type = INPUT_KEYBOARD;
-                inputs[1].u.ki.wVk = 0;
-                inputs[1].u.ki.wScan = (ushort)ch;
-                inputs[1].u.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
-
-                var hInput = Marshal.AllocHGlobal(size);
-                try
+                var down = new INPUT
                 {
-                    for (var j = 0; j < inputs.Length; j++)
-                        Marshal.StructureToPtr(inputs[j], hInput + j * size, false);
-                    SendInput(2, hInput, size);
-                }
-                finally
+                    type = INPUT_KEYBOARD,
+                    u = new INPUTUNION
+                    {
+                        ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE }
+                    }
+                };
+                var up = new INPUT
                 {
-                    Marshal.FreeHGlobal(hInput);
-                }
-            }
+                    type = INPUT_KEYBOARD,
+                    u = new INPUTUNION
+                    {
+                        ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP }
+                    }
+                };
 
-            if (delayMs > 0)
-                Thread.Sleep(delayMs);
+                Marshal.StructureToPtr(down, hInput, false);
+                Marshal.StructureToPtr(up, hInput + size, false);
+                SendInput(2, hInput, size);
+
+                if (delayMs > 0 && i + 1 < text.Length)
+                    Thread.Sleep(delayMs);
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(hInput);
         }
 
         if (prevWindow != IntPtr.Zero)
