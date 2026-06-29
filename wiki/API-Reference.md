@@ -247,3 +247,108 @@
   "continuous": true
 }
 ```
+
+## Дашборд
+
+### GET /api/dashboard/stats
+
+Получить KPI-статистику для дашборда.
+
+**Ответ:**
+```json
+{
+  "totalScanners": 3,
+  "activeScanners": 2,
+  "totalScans": 15420,
+  "scansToday": 847,
+  "successRate": 98.5,
+  "dbSizeMb": 1.23
+}
+```
+
+### GET /api/dashboard/activity
+
+Получить данные активности по часам/дням.
+
+**Параметры:**
+- `period` — период: `24h` (по умолчанию), `7d`, `30d`
+
+**Ответ:**
+```json
+{
+  "labels": ["14:00", "15:00", "16:00"],
+  "data": [12, 45, 67]
+}
+```
+
+### GET /api/dashboard/scans
+
+Получить последние сканирования.
+
+**Параметры:**
+- `limit` — максимальное количество (по умолчанию 50)
+
+**Ответ:**
+```json
+[
+  {
+    "timestamp": "2026-06-29T10:30:00Z",
+    "scannerName": "Main",
+    "format": "EAN-13",
+    "parsedData": "5901234123457",
+    "isValid": true
+  }
+]
+```
+
+### GET /api/dashboard/formats
+
+Получить распределение по форматам штрихкодов.
+
+**Ответ:**
+```json
+{
+  "labels": ["EAN-13", "QR", "Code128"],
+  "data": [1200, 450, 890],
+  "colors": ["#3B82F6", "#10B981", "#F59E0B"]
+}
+```
+
+### GET /api/dashboard/per-scanner
+
+Получить статистику по каждому сканеру.
+
+**Ответ:**
+```json
+[
+  {
+    "name": "Main",
+    "total": 5420,
+    "valid": 5380,
+    "lastScan": "2026-06-29T10:30:00Z",
+    "isActive": true,
+    "uptime": "2ч 15м",
+    "uptimeSeconds": 8100,
+    "avgScansPerHour": 12.5
+  }
+]
+```
+
+### GET /api/dashboard/reconnects
+
+Получить ошибки переподключения.
+
+**Параметры:**
+- `hours` — период в часах (по умолчанию 24)
+
+**Ответ:**
+```json
+[
+  {
+    "timestamp": "2026-06-29T10:15:00Z",
+    "scannerName": "Main",
+    "errorMessage": "The port 'COM2' does not exist.",
+    "attemptNumber": 3
+  }
+]
+```

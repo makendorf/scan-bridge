@@ -4,7 +4,7 @@
 
 ```
 COM-порт → SerialPortService → SimpleBarcodeParser → ScanProcessorService
-    → PostScanManager → [PostScanActionFactory] → [actions...]
+    → ScanTracker + ScanHistoryService → PostScanManager → [PostScanActionFactory] → [actions...]
 ```
 
 ## Поток данных
@@ -12,8 +12,10 @@ COM-порт → SerialPortService → SimpleBarcodeParser → ScanProcessorServ
 1. **SerialPortService** — фоновый сервис, слушающий COM-порт
 2. **SimpleBarcodeParser** — парсит сырые данные, определяет формат
 3. **ScanProcessorService** — координирует обработку
-4. **PostScanManager** — выполняет группы пост-скан действий
-5. **PostScanActionFactory** — создаёт экземпляры действий по типу
+4. **ScanTracker** — записывает время последнего сканирования (память)
+5. **ScanHistoryService** — сохраняет историю сканирований в SQLite (fire-and-forget)
+6. **PostScanManager** — выполняет группы пост-скан действий
+7. **PostScanActionFactory** — создаёт экземпляры действий по типу
 
 ## Ключевые компоненты
 
@@ -28,6 +30,8 @@ builder.Services.AddSingleton<IPostScanActionFactory, PostScanActionFactory>();
 builder.Services.AddSingleton<PostScanManager>();
 builder.Services.AddSingleton<ScanProcessorService>();
 builder.Services.AddSingleton<ScannerManager>();
+builder.Services.AddSingleton<ScanTracker>();
+builder.Services.AddSingleton<ScanHistoryService>();
 ```
 
 ### ScannerManager
@@ -108,6 +112,7 @@ ScanBridge/
 ├── src/
 │   ├── Api/                       # Extension-методы для API endpoints
 │   │   ├── DbHelpers.cs           # Хелперы для работы с БД
+│   │   ├── DashboardEndpoints.cs  # /api/dashboard/*
 │   │   ├── ScannerEndpoints.cs    # /api/scanners
 │   │   ├── LogEndpoints.cs        # /api/logs
 │   │   ├── PortEndpoints.cs       # /api/ports
@@ -126,11 +131,9 @@ ScanBridge/
 │   ├── Utils/                     # Утилиты
 │   │   ├── Win32Clipboard.cs      # Win32 API для буфера обмена
 │   │   └── ControlCharDisplay.cs
-│   ├── wwwroot/                   # Веб-интерфейс
+│   ├── wwwroot/                   # Веб-интерфейс (включая дашборд)
 │   └── Program.cs                 # Точка входа (~200 строк)
 ├── tests/                         # Тесты (xUnit + Moq)
-├── hub/                           # Hub-проект (центральный хаб)
-├── hub.Tests/                     # Тесты Hub
 ├── wiki/                          # Документация
 └── ScanBridge.slnx
 ```
@@ -184,3 +187,5 @@ SQLite файл: `scanbridge.db` (путь настраивается через
 - **PostScanActionGroupScanners** — связи групп со сканерами
 - **Settings** — общие настройки приложения
 - **Logs** — записи логов
+- **ScanHistory** — история сканирований (для дашборда)
+- **ReconnectEvents** — события переподключения

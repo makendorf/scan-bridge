@@ -8,8 +8,8 @@
 - [[Configuration]]
 - [[COM-Port-Setup]]
 - [[Post-Scan-Actions]]
+- [[API-Reference]]
 
 ## Разработка
-- [[API-Reference]]
 - [[Development]]
 - [[Testing]]

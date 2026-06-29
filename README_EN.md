@@ -9,11 +9,14 @@ ScanBridge is a server application for receiving data from barcode and QR code s
 ## Features
 
 - **Multiple scanners** — parallel operation with unlimited number of scanners
+- **Action groups** — post-scan actions organized in groups with scanner bindings
 - **Auto-reconnection** — automatic recovery on COM port connection loss
 - **Format detection** — recognition of UUID, EAN-8/13, UPC-A, GTIN-14, Code128, GS1-128
 - **QR content** — detection of QR code content types (URL, JSON, WiFi, vCard)
 - **Flexible actions** — configurable post-scan processing pipeline
 - **Web interface** — manage scanners and actions through browser
+- **Dashboard** — real-time analytics: KPI, activity charts, format distribution, scanner status
+- **Hub** — central hub for monitoring multiple ScanBridge instances (separate repo: [scanbridge-hub](https://github.com/makendorf/scanbridge-hub))
 
 ## Tech Stack
 
@@ -29,42 +32,44 @@ ScanBridge is a server application for receiving data from barcode and QR code s
 ```
 ScanBridge/
 ├── src/
-│   ├── Data/                    # EF Core DbContext
+│   ├── Api/                    # Extension methods for API endpoints
+│   │   ├── DashboardEndpoints.cs
+│   │   ├── ScannerEndpoints.cs
+│   │   ├── LogEndpoints.cs
+│   │   ├── PortEndpoints.cs
+│   │   ├── PostScanEndpoints.cs
+│   │   └── SettingsEndpoints.cs
+│   ├── Data/                   # EF Core DbContext
 │   │   ├── AppDbContext.cs
-│   │   └── Entities/            # Database entities
+│   │   └── Entities/
 │   │       ├── AppSetting.cs
 │   │       ├── LogRecord.cs
 │   │       ├── PostScanAction.cs
+│   │       ├── ReconnectEvent.cs
+│   │       ├── ScanHistory.cs
 │   │       └── ScannerConfig.cs
-│   ├── Models/                  # Data models
+│   ├── Models/                 # Data models
 │   │   ├── PostScanActionConfig.cs
 │   │   ├── ScanResult.cs
 │   │   └── SerialPortConfig.cs
-│   ├── Parsers/                 # Barcode parsers
+│   ├── Parsers/                # Barcode parsers
 │   │   ├── IBarcodeParser.cs
 │   │   ├── QRContentDetector.cs
 │   │   └── SimpleBarcodeParser.cs
-│   ├── Services/                # Business logic
-│   │   ├── CollectorSink.cs
-│   │   ├── IPostScanAction.cs
-│   │   ├── LogCollector.cs
-│   │   ├── PostScanManager.cs
+│   ├── Services/               # Business logic
+│   │   ├── ScanHistoryService.cs
 │   │   ├── ScannerManager.cs
 │   │   ├── ScanProcessorService.cs
 │   │   ├── SerialPortService.cs
-│   │   └── PostScanActions/     # Action types
-│   │       ├── ClipboardPasteAction.cs
-│   │       ├── ExportAction.cs
-│   │       ├── LogAction.cs
-│   │       └── ReplacementAction.cs
-│   ├── wwwroot/                 # Web interface
+│   │   └── PostScanActions/
+│   ├── wwwroot/                # Web interface + dashboard
+│   │   ├── css/dashboard.css
+│   │   ├── js/dashboard.js
 │   │   └── index.html
-│   └── Program.cs               # Entry point
-├── tests/                       # Tests (xUnit + Moq)
-│   ├── Parsers/
-│   └── Services/
-├── ScanBridge.slnx
-└── README.md
+│   └── Program.cs
+├── tests/                      # Tests (xUnit + Moq)
+├── wiki/                       # Documentation
+└── ScanBridge.slnx
 ```
 
 ## Post-Scan Actions
@@ -74,7 +79,14 @@ ScanBridge/
 | **Log** | Write scan data to database |
 | **Replacement** | Substitute substrings in data (Find → Replace, mode: All / Start / End) |
 | **Clipboard Paste** | Paste data into active window via Ctrl+V (WinAPI) |
+| **Window Paste** | Paste data into selected window by title (WinAPI) |
 | **Export** | Export to JSON/XML with configurable tags |
+| **Validation** | Validate data (regex, dictionary, numeric range, format) |
+| **DataEnrichment** | Enrich data via HTTP request |
+| **Aggregation** | Aggregate scans with periodic output |
+| **DatabaseQuery** | Query external database |
+| **Telegram** | Telegram notifications |
+| **Email** | Email notifications |
 
 ### Export Destinations
 
@@ -118,7 +130,7 @@ Example scanner configuration via web interface:
 
 ```
 COM Port → SerialPortService → SimpleBarcodeParser → ScanProcessorService
-    → PostScanManager → [Replacement → ClipboardPaste → Export]
+    → ScanTracker + ScanHistoryService → PostScanManager → [actions...]
 ```
 
 - Each scanner runs in a separate `BackgroundService`
@@ -132,7 +144,7 @@ COM Port → SerialPortService → SimpleBarcodeParser → ScanProcessorService
 dotnet test
 ```
 
-Project contains 120 tests: parsers, services, post-scan actions.
+Project contains 192 tests: parsers, services, post-scan actions.
 
 ## License
 

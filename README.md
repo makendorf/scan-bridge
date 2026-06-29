@@ -15,7 +15,8 @@
 - **QR-контент** — определение типа содержимого QR-кодов (URL, JSON, WiFi, vCard)
 - **Гибкие действия** — настраиваемый пайплайн: Log, Replacement, ClipboardPaste, WindowPaste, Export, Validation, DataEnrichment, Aggregation, DatabaseQuery, Telegram, Email
 - **Веб-интерфейс** — управление сканерами и действиями через браузер
-- **Hub** — центральный хаб для мониторинга нескольких экземпляров ScanBridge
+- **Дашборд** — аналитика в реальном времени: KPI, графики активности, распределение форматов, статус сканеров
+- **Hub** — центральный хаб для мониторинга нескольких экземпляров (отдельный репозиторий: [scanbridge-hub](https://github.com/makendorf/scanbridge-hub))
 
 ## Стек технологий
 
@@ -43,10 +44,8 @@ ScanBridge/
 │   │   ├── PostScanActionFactory.cs
 │   │   └── ...
 │   ├── Utils/                     # Утилиты (Win32Clipboard, ControlCharDisplay)
-│   ├── wwwroot/                   # Веб-интерфейс
+│   ├── wwwroot/                   # Веб-интерфейс (включая дашборд)
 │   └── Program.cs                 # Точка входа
-├── hub/                           # Hub-проект (центральный хаб)
-├── hub.Tests/                     # Тесты Hub
 ├── tests/                         # Тесты (xUnit + Moq)
 ├── wiki/                          # Документация
 └── ScanBridge.slnx
@@ -94,7 +93,7 @@ dotnet run
 
 ```
 COM-порт → SerialPortService → SimpleBarcodeParser → ScanProcessorService
-    → PostScanManager → [PostScanActionFactory] → [actions...]
+    → ScanTracker + ScanHistoryService → PostScanManager → [actions...]
 ```
 
 - Каждый сканер работает в отдельном `BackgroundService`
