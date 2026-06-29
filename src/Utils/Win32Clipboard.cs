@@ -26,7 +26,7 @@ internal static class Win32Clipboard
     private static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
 
     [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+    private static extern uint SendInput(uint nInputs, IntPtr pInputs, int cbSize);
 
     private const byte VK_CONTROL = 0x11;
     private const byte VK_V = 0x56;
@@ -34,29 +34,6 @@ internal static class Win32Clipboard
     private const uint CF_UNICODETEXT = 13;
     private const uint INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_UNICODE = 0x0004;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct INPUT
-    {
-        public uint type;
-        public INPUTUNION u;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    private struct INPUTUNION
-    {
-        [FieldOffset(0)] public KEYBDINPUT ki;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct KEYBDINPUT
-    {
-        public ushort wVk;
-        public ushort wScan;
-        public uint dwFlags;
-        public uint time;
-        public IntPtr dwExtraInfo;
-    }
 
     internal static void SetClipboardText(string text)
     {
@@ -106,33 +83,37 @@ internal static class Win32Clipboard
 
     internal static void SimulateTyping(string text, int delayMs = 10)
     {
-        var inputs = new INPUT[text.Length * 2];
+        const int INPUT_SIZE = 40;
+
+        var inputSize = Marshal.SizeOf<UIntPtr>() == 8 ? INPUT_SIZE : 28;
+
         for (var i = 0; i < text.Length; i++)
         {
             var ch = text[i];
-            inputs[i * 2] = new INPUT
-            {
-                type = INPUT_KEYBOARD,
-                u = new INPUTUNION
-                {
-                    ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE }
-                }
-            };
-            inputs[i * 2 + 1] = new INPUT
-            {
-                type = INPUT_KEYBOARD,
-                u = new INPUTUNION
-                {
-                    ki = new KEYBDINPUT { wVk = 0, wScan = ch, dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP }
-                }
-            };
-        }
+            var hInput = Marshal.AllocHGlobal(inputSize);
 
-        const int size = 28;
-        for (var i = 0; i < inputs.Length; i += 2)
-        {
-            SendInput(2, [inputs[i], inputs[i + 1]], size);
-            if (delayMs > 0 && i + 2 < inputs.Length)
+            try
+            {
+                Marshal.WriteInt32(hInput, 0, (int)INPUT_KEYBOARD);
+
+                var kiOffset = Marshal.SizeOf<uint>();
+                Marshal.WriteInt16(hInput, kiOffset, 0);
+                Marshal.WriteInt16(hInput, kiOffset + 2, (short)ch);
+                Marshal.WriteInt32(hInput, kiOffset + 4, (int)KEYEVENTF_UNICODE);
+                Marshal.WriteInt32(hInput, kiOffset + 8, 0);
+                Marshal.WriteInt64(hInput, kiOffset + 12, 0);
+
+                SendInput(1, hInput, inputSize);
+
+                Marshal.WriteInt32(hInput, kiOffset + 4, (int)(KEYEVENTF_UNICODE | KEYEVENTF_KEYUP));
+                SendInput(1, hInput, inputSize);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(hInput);
+            }
+
+            if (delayMs > 0 && i + 1 < text.Length)
                 Thread.Sleep(delayMs);
         }
     }
