@@ -46,6 +46,9 @@ public class PostScanActionFactory : IPostScanActionFactory
             "DatabaseQuery" => new DatabaseQueryAction(
                 _loggerFactory.CreateLogger<DatabaseQueryAction>(),
                 settings),
+            "Pause" => new PauseAction(
+                _loggerFactory.CreateLogger<PauseAction>(),
+                settings),
             _ => null
         };
     }
