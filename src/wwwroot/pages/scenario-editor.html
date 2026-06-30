@@ -1,0 +1,69 @@
+<div class="scenario-editor-layout">
+    <div class="scenario-editor-toolbar">
+        <button class="btn btn-secondary btn-sm" onclick="navigateTo('scenarios')">
+            <i data-lucide="arrow-left"></i> Назад
+        </button>
+        <div class="scenario-editor-title" id="scenarioEditorTitle">Новый сценарий</div>
+        <div class="scenario-editor-actions">
+            <button class="btn btn-secondary btn-sm" onclick="validateScenario()">
+                <i data-lucide="check-circle"></i> Валидация
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="saveScenarioFromEditor()">
+                <i data-lucide="save"></i> Сохранить
+            </button>
+        </div>
+    </div>
+    <div class="scenario-node-palette">
+        <span class="palette-label">Узлы:</span>
+        <div class="palette-node" draggable="true" data-type="Start">
+            <i data-lucide="play"></i> Старт
+        </div>
+        <span class="palette-separator"></span>
+        <div class="palette-node palette-action" draggable="true" data-type="Log">
+            <i data-lucide="scroll-text"></i> Лог
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="Replacement">
+            <i data-lucide="replace"></i> Замена
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="ClipboardPaste">
+            <i data-lucide="clipboard-paste"></i> Буфер
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="WindowPaste">
+            <i data-lucide="app-window"></i> Окно
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="Export">
+            <i data-lucide="download"></i> Экспорт
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="Telegram">
+            <i data-lucide="send"></i> Telegram
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="Email">
+            <i data-lucide="mail"></i> Email
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="DataEnrichment">
+            <i data-lucide="database"></i> Обогащение
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="Validation">
+            <i data-lucide="check-circle"></i> Валидация
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="Aggregation">
+            <i data-lucide="layers"></i> Агрегация
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="DatabaseQuery">
+            <i data-lucide="hard-drive"></i> Запрос БД
+        </div>
+        <div class="palette-node palette-action" draggable="true" data-type="Pause">
+            <i data-lucide="pause"></i> Пауза
+        </div>
+        <span class="palette-separator"></span>
+        <div class="palette-node" draggable="true" data-type="Condition">
+            <i data-lucide="git-branch"></i> Условие
+        </div>
+        <div class="palette-node" draggable="true" data-type="End">
+            <i data-lucide="square"></i> Конец
+        </div>
+    </div>
+    <div class="scenario-canvas-wrapper">
+        <div id="scenarioDrawflow" class="drawflow"></div>
+    </div>
+</div>

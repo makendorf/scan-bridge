@@ -115,30 +115,11 @@ function initScenarioEditor(scenario) {
         importScenarioToDrawflow(scenario);
     }
 
+    setupPaletteDragDrop();
     lucide.createIcons();
 }
 
 /* ── ShowWhen Filtering ── */
-function filterShowWhen() {
-    const container = document.getElementById('nodeSettingsContent');
-    if (!container) return;
-
-    // Collect current values from all selects
-    const values = {};
-    container.querySelectorAll('.vs-setting').forEach(el => {
-        values[el.dataset.key] = el.value;
-    });
-
-    // Filter groups with data-show-when
-    container.querySelectorAll('[data-show-when]').forEach(group => {
-        const rule = group.dataset.showWhen; // e.g. "Destination=folder" or "Destination=ftp|sftp"
-        const [field, allowed] = rule.split('=');
-        const allowedValues = allowed.split('|');
-        const currentValue = values[field] || '';
-        group.style.display = allowedValues.includes(currentValue) ? '' : 'none';
-    });
-}
-
 /* ── Import Scenario to Drawflow ── */
 function importScenarioToDrawflow(scenario) {
     const nodeMap = {};
@@ -174,7 +155,7 @@ function importScenarioToDrawflow(scenario) {
 }
 
 /* ── Drag & Drop from Palette ── */
-document.addEventListener('DOMContentLoaded', () => {
+function setupPaletteDragDrop() {
     document.querySelectorAll('.palette-node').forEach(el => {
         el.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('nodeType', el.dataset.type);
@@ -211,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
         });
     }
-});
+}
 
 /* ── Node Events ── */
 function onNodeCreated(id) {
@@ -248,62 +229,19 @@ function openNodeSettingsModal(id) {
     const content = document.getElementById('nodeSettingsContent');
     const title = document.getElementById('nodeSettingsTitle');
     const nodeClass = nodeInfo.class;
-
-    // Determine if this is an action node
     const isAction = ACTION_TYPES.hasOwnProperty(nodeClass);
 
     if (isAction) {
         const actionDef = ACTION_TYPES[nodeClass];
         title.textContent = `Настройки: ${actionDef.name}`;
 
-        let settingsHtml = '';
-        if (actionDef.settings && actionDef.settings.length > 0) {
-            settingsHtml = actionDef.settings.map(s => {
-                const showWhenAttr = s.showWhen ? ` data-show-when="${escapeHtml(s.showWhen)}"` : '';
-                if (s.type === 'select') {
-                    return `
-                        <div class="form-group"${showWhenAttr}>
-                            <label>${escapeHtml(s.label)}</label>
-                            <select class="vs-setting" data-key="${s.key}" ${s.showWhen ? 'onchange="filterShowWhen()"' : ''}>
-                                ${s.options.map(opt => `<option value="${opt}" ${opt === s.default ? 'selected' : ''}>${s.optionLabels ? escapeHtml(s.optionLabels[opt]) : opt}</option>`).join('')}
-                            </select>
-                            ${s.hint ? `<div class="hint">${escapeHtml(s.hint)}</div>` : ''}
-                        </div>`;
-                } else if (s.type === 'number') {
-                    return `
-                        <div class="form-group"${showWhenAttr}>
-                            <label>${escapeHtml(s.label)}</label>
-                            <input class="vs-setting" data-key="${s.key}" type="number" value="${escapeHtml(s.default || '')}">
-                            ${s.hint ? `<div class="hint">${escapeHtml(s.hint)}</div>` : ''}
-                        </div>`;
-                } else if (s.type === 'replacements' || s.type === 'tags') {
-                    return `
-                        <div class="form-group full"${showWhenAttr}>
-                            <label>${escapeHtml(s.label)}</label>
-                            <textarea class="vs-setting" data-key="${s.key}" rows="4" placeholder="${s.type === 'tags' ? 'JSON массив тегов' : 'JSON массив правил'}"></textarea>
-                            ${s.hint ? `<div class="hint">${escapeHtml(s.hint)}</div>` : ''}
-                        </div>`;
-                } else {
-                    return `
-                        <div class="form-group"${showWhenAttr}>
-                            <label>${escapeHtml(s.label)}</label>
-                            <input class="vs-setting" data-key="${s.key}" type="text" value="${escapeHtml(s.default || '')}">
-                            ${s.hint ? `<div class="hint">${escapeHtml(s.hint)}</div>` : ''}
-                        </div>`;
-                }
-            }).join('');
-        }
+        // Load existing settings from node data
+        const existing = getDrawflowNodeSettings(id);
 
-        content.innerHTML = `
-            <div class="form-group full">
-                <label>Описание</label>
-                <p class="hint">${escapeHtml(actionDef.description)}</p>
-            </div>
-            ${settingsHtml ? `<div class="form-section-title">Параметры</div><div class="form-grid">${settingsHtml}</div>` : '<p class="hint">Нет настраиваемых параметров</p>'}
-        `;
+        // Use shared updateActionSettings with unique container IDs
+        content.innerHTML = `<div id="nodeActionDescription"></div><div class="form-grid" id="nodeActionSettings"></div>`;
+        updateActionSettings(nodeClass, existing, 'nodeActionSettings');
 
-        // Apply showWhen filtering after rendering
-        filterShowWhen();
     } else if (nodeClass === 'Condition') {
         title.textContent = 'Настройки: Условие';
         const settings = getDrawflowNodeSettings(id);
@@ -343,7 +281,7 @@ function openNodeSettingsModal(id) {
         content.innerHTML = `<p class="hint">Настройки для типа «${escapeHtml(nodeClass)}» отсутствуют</p>`;
     }
 
-    loadNodeSettingsToUI(id);
+    loadNodeSettingsToUI(id, isAction);
     openModal('nodeSettingsModal');
 }
 
@@ -368,7 +306,8 @@ function getDrawflowNodeSettings(id) {
     return data?.data?.settings || {};
 }
 
-function loadNodeSettingsToUI(id) {
+function loadNodeSettingsToUI(id, skipForAction) {
+    if (skipForAction) return; // updateActionSettings already loaded values
     const settings = getDrawflowNodeSettings(id);
     document.querySelectorAll('#nodeSettingsContent .vs-setting').forEach(el => {
         const key = el.dataset.key;
@@ -379,33 +318,72 @@ function loadNodeSettingsToUI(id) {
 }
 
 function saveNodeSettingsFromUI(id) {
-    const settings = {};
-    document.querySelectorAll('#nodeSettingsContent .vs-setting').forEach(el => {
-        settings[el.dataset.key] = el.value;
-    });
+    if (!drawflowEditor) return;
+    const nodeInfo = drawflowEditor.getNodeFromId(parseInt(id));
+    if (!nodeInfo) return;
+
+    let settings;
+    const nodeClass = nodeInfo.class;
+    const isAction = ACTION_TYPES.hasOwnProperty(nodeClass);
+
+    if (isAction) {
+        // Use shared getActionSettings for action nodes
+        _activeSettingsContainer = 'nodeActionSettings';
+        settings = getActionSettings(nodeClass);
+    } else {
+        // For Condition and other nodes, use the old selector
+        settings = {};
+        document.querySelectorAll('#nodeSettingsContent .vs-setting').forEach(el => {
+            settings[el.dataset.key] = el.value;
+        });
+    }
+
     drawflowEditor.updateNodeDataFromId(parseInt(id), { settings });
 }
 
 /* ── Save Scenario from Editor ── */
-async function saveScenarioFromEditor() {
+let pendingScenarioData = null;
+
+function saveScenarioFromEditor() {
     if (!drawflowEditor) return;
 
     const exportData = drawflowEditor.export();
-    const scenario = exportDrawflowToScenario(exportData);
+    pendingScenarioData = exportDrawflowToScenario(exportData);
 
-    // Prompt for name/description if new
     if (!editingScenarioConfig) {
-        const name = prompt('Имя сценария:');
-        if (!name) return;
-        scenario.name = name;
-        scenario.description = prompt('Описание (необязательно):') || '';
+        // New scenario — show modal for name/description
+        document.getElementById('scenarioSaveName').value = '';
+        document.getElementById('scenarioSaveDesc').value = '';
+        openModal('scenarioSaveModal');
+        setTimeout(() => document.getElementById('scenarioSaveName').focus(), 100);
     } else {
-        scenario.name = editingScenarioConfig.name;
-        scenario.description = editingScenarioConfig.description;
-        scenario.id = editingScenarioConfig.id;
-        scenario.scannerNames = editingScenarioConfig.scannerNames || [];
+        // Existing scenario — save directly
+        pendingScenarioData.name = editingScenarioConfig.name;
+        pendingScenarioData.description = editingScenarioConfig.description;
+        pendingScenarioData.id = editingScenarioConfig.id;
+        pendingScenarioData.scannerNames = editingScenarioConfig.scannerNames || [];
+        doSaveScenario(pendingScenarioData);
     }
+}
 
+function confirmScenarioSave() {
+    const name = document.getElementById('scenarioSaveName').value.trim();
+    if (!name) {
+        document.getElementById('scenarioSaveName').focus();
+        return;
+    }
+    pendingScenarioData.name = name;
+    pendingScenarioData.description = document.getElementById('scenarioSaveDesc').value.trim();
+    closeModal('scenarioSaveModal');
+    doSaveScenario(pendingScenarioData);
+}
+
+function cancelScenarioSave() {
+    pendingScenarioData = null;
+    closeModal('scenarioSaveModal');
+}
+
+async function doSaveScenario(scenario) {
     try {
         let res;
         if (scenario.id) {
@@ -429,7 +407,7 @@ async function saveScenarioFromEditor() {
 
         showToast('Сценарий сохранён', 'success');
         editingScenarioConfig = null;
-        switchPanel('scenarios');
+        navigateTo('scenarios');
         loadScenarios();
     } catch (e) {
         console.error('Failed to save scenario:', e);

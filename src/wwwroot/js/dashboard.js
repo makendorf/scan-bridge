@@ -7,6 +7,7 @@ let dashCurrentPeriod = '24h';
 const DASH_POLL_MS = 10000;
 
 async function loadDashboard() {
+    if (!document.getElementById('dashLastUpdate')) return;
     await Promise.all([
         loadDashStats(),
         loadDashActivity(dashCurrentPeriod),
@@ -38,6 +39,7 @@ async function loadDashActivity(period) {
     document.querySelectorAll('.dashboard-period-btns .btn').forEach(b => {
         b.classList.toggle('active', b.dataset.period === period);
     });
+    if (!document.getElementById('activityChart')) return;
     try {
         const r = await fetch('/api/dashboard/activity?period=' + period);
         const d = await r.json();
@@ -142,6 +144,7 @@ async function loadDashScans() {
         const scans = await r.json();
         const tbody = document.getElementById('dashScansBody');
         const empty = document.getElementById('dashScansEmpty');
+        if (!tbody || !empty) return;
         if (!scans.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
         empty.classList.add('hidden');
         tbody.innerHTML = scans.map(s => `<tr>
@@ -161,6 +164,7 @@ async function loadDashPerScanner() {
         const r = await fetch('/api/dashboard/per-scanner');
         const scanners = await r.json();
         const container = document.getElementById('dashScannerCards');
+        if (!container) return;
         if (!scanners.length) {
             container.innerHTML = '<div class="empty-state"><i data-lucide="scan-barcode"></i><p>Нет сканеров</p></div>';
             return;
@@ -202,6 +206,7 @@ async function loadDashReconnects() {
         const errors = await r.json();
         const container = document.getElementById('dashReconnects');
         const empty = document.getElementById('dashReconnectsEmpty');
+        if (!container || !empty) return;
         if (!errors.length) { container.innerHTML = ''; empty.classList.remove('hidden'); return; }
         empty.classList.add('hidden');
         container.innerHTML = errors.slice(0, 20).map(e => `<div class="dashboard-reconnect-item">

@@ -1,0 +1,17 @@
+<div class="glass-card">
+    <div class="glass-card-header">
+        <h2><i data-lucide="git-branch"></i> Визуальные сценарии</h2>
+        <button class="btn btn-primary" onclick="showCreateScenario()">
+            <i data-lucide="plus"></i> Создать сценарий
+        </button>
+    </div>
+    <div class="info-banner">
+        <i data-lucide="info"></i>
+        Сценарии позволяют визуально построить граф обработки сканирований. Поддерживаются узлы: Старт, Действие, Условие, Конец.
+    </div>
+    <div id="scenarioCards" class="group-grid"></div>
+    <div id="scenariosEmpty" class="empty-state">
+        <i data-lucide="git-branch"></i>
+        <p>Нет сценариев. Создайте сценарий для визуального построения обработки данных.</p>
+    </div>
+</div>

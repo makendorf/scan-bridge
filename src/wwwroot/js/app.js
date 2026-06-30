@@ -1,31 +1,16 @@
 /* ── ScanBridge App (init + navigation) ── */
 
 function updateStats() {
-    document.getElementById('statScanners').textContent = scanners.length;
-    document.getElementById('kpiScanners').textContent = scanners.length;
-    document.getElementById('kpiActive').textContent = scanners.length;
+    const el = (id) => document.getElementById(id);
+    if (el('statScanners')) el('statScanners').textContent = scanners.length;
+    if (el('kpiScanners')) el('kpiScanners').textContent = scanners.length;
+    if (el('kpiActive')) el('kpiActive').textContent = scanners.length;
     const totalActions = postScanGroups.reduce((sum, g) => sum + (g.actions ? g.actions.length : 0), 0);
-    document.getElementById('kpiActions').textContent = totalActions;
-    document.getElementById('statActions').textContent = postScanGroups.length;
+    if (el('kpiActions')) el('kpiActions').textContent = totalActions;
+    if (el('statActions')) el('statActions').textContent = postScanGroups.length;
 }
 
-/* ── Navigation ── */
-function switchPanel(name) {
-    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-    const sidebarLink = document.querySelector(`.sidebar-link[data-panel="${name}"]`);
-    if (sidebarLink) sidebarLink.classList.add('active');
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('panel-' + name).classList.add('active');
-    if (name === 'logs') { loadLogs(); startLogPolling(); stopDashPolling(); }
-    else { stopLogPolling(); }
-    if (name === 'actions') { loadGroups(); stopDashPolling(); }
-    if (name === 'scanners') { load(); loadSettings(); stopDashPolling(); }
-    if (name === 'dashboard') { loadDashboard(); startDashPolling(); }
-    if (name === 'scenarios') { loadScenarios(); stopDashPolling(); }
-    if (name === 'scenario-editor') { stopDashPolling(); }
-    closeSidebar();
-}
-
+/* ── Sidebar Toggle ── */
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('sidebarBackdrop').classList.toggle('open');
@@ -35,13 +20,16 @@ function closeSidebar() {
     document.getElementById('sidebarBackdrop').classList.remove('open');
 }
 
-/* ── Action Type Change Listener ── */
-document.getElementById('fActionType').addEventListener('change', function() {
-    updateActionSettings(this.value, {});
+/* ── Action Type Change Listener (setup after DOM ready) ── */
+document.addEventListener('DOMContentLoaded', () => {
+    const fActionType = document.getElementById('fActionType');
+    if (fActionType) {
+        fActionType.addEventListener('change', function() {
+            updateActionSettings(this.value, {});
+        });
+    }
 });
 
 /* ── Init ── */
 lucide.createIcons();
-load();
-loadSettings();
-loadGroups();
+Router.init();

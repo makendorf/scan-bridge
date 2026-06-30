@@ -1,0 +1,16 @@
+<div class="glass-card">
+    <div class="glass-card-header">
+        <h2><i data-lucide="scroll-text"></i> Логи</h2>
+        <button class="btn btn-secondary" onclick="clearLogs()">
+            <i data-lucide="trash-2"></i> Очистить
+        </button>
+    </div>
+    <div class="log-toolbar">
+        <label><input type="checkbox" id="autoScroll" checked> Автопрокрутка</label>
+        <label><input type="checkbox" id="showINF" checked> INF</label>
+        <label><input type="checkbox" id="showWRN" checked> WRN</label>
+        <label><input type="checkbox" id="showERR" checked> ERR</label>
+        <label><input type="checkbox" id="showDBG"> DBG</label>
+    </div>
+    <div class="log-panel" id="logPanel"></div>
+</div>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>СканМост</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/layout.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/modals.css">
+    <link rel="stylesheet" href="/css/panels.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <link rel="stylesheet" href="/css/scenarios.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/drawflow@0.0.59/dist/drawflow.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/drawflow@0.0.59/dist/drawflow.min.js"></script>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <button class="mobile-toggle" onclick="toggleSidebar()" aria-label="Меню">
+            <i data-lucide="menu"></i>
+        </button>
+        <a class="header-logo" href="/">
+            <i data-lucide="scan-barcode" style="width:24px;height:24px"></i>
+            СканМост
+            <span class="header-subtitle">Управление сканерами</span>
+        </a>
+        <div class="header-right">
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Переключить тему" title="Светлая/тёмная тема">
+                <span class="icon-sun"><i data-lucide="sun"></i></span>
+                <span class="icon-moon"><i data-lucide="moon"></i></span>
+            </button>
+            <div class="header-status">
+                <span class="status-dot"></span>
+                <span id="headerStatus">Онлайн</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar Backdrop (mobile) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+            <a class="sidebar-link" data-page="dashboard" onclick="navigateTo('dashboard')">
+                <i data-lucide="layout-dashboard"></i> Дашборд
+            </a>
+            <a class="sidebar-link active" data-page="scanners" onclick="navigateTo('scanners')">
+                <i data-lucide="scan-barcode"></i> Сканеры
+            </a>
+            <a class="sidebar-link" data-page="actions" onclick="navigateTo('actions')">
+                <i data-lucide="zap"></i> Действия
+            </a>
+            <a class="sidebar-link" data-page="scenarios" onclick="navigateTo('scenarios')">
+                <i data-lucide="git-branch"></i> Сценарии
+            </a>
+            <a class="sidebar-link" data-page="logs" onclick="navigateTo('logs')">
+                <i data-lucide="scroll-text"></i> Логи
+            </a>
+        </nav>
+
+        <div class="sidebar-stats">
+            <h4>Статистика</h4>
+            <div class="stat-row">
+                <span class="stat-label">Сканеров</span>
+                <span class="stat-value" id="statScanners">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Действий</span>
+                <span class="stat-value" id="statActions">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Портов</span>
+                <span class="stat-value" id="statPorts">0</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content — pages loaded here by router -->
+    <main class="main" id="page-content"></main>
+
+    <!-- ═══════ SCANNER EDITOR MODAL ═══════ -->
+    <div class="modal-overlay" id="scannerModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="scannerModalTitle">Добавить сканер</h2>
+                <button class="btn-icon" onclick="hideScannerModal()"><i data-lucide="x"></i></button>
+            </div>
+            <input type="hidden" id="editIndex" value="-1">
+            <div class="form-grid">
+                <div class="form-group"><label>Имя</label><input id="fName" placeholder="напр. Основной"></div>
+                <div class="form-group">
+                    <label>COM-порт</label>
+                    <select id="fPort"><option value="">Загрузка...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Скорость (бод)</label>
+                    <select id="fBaud"><option>9600</option><option>19200</option><option>38400</option><option>57600</option><option>115200</option></select>
+                </div>
+                <div class="form-group"><label>Биты данных</label><select id="fDataBits"><option>7</option><option selected>8</option></select></div>
+                <div class="form-group"><label>Чётность</label><select id="fParity"><option selected>None</option><option>Odd</option><option>Even</option><option>Mark</option><option>Space</option></select></div>
+                <div class="form-group"><label>Стоп-биты</label><select id="fStopBits"><option selected>One</option><option>OnePointFive</option><option>Two</option></select></div>
+                <div class="form-group">
+                    <label>Управление потоком</label>
+                    <select id="fHandshake"><option selected>RequestToSend</option><option>None</option><option>XOnXOff</option><option>RequestToSendXOnXOff</option></select>
+                </div>
+                <div class="form-group"><label>Таймаут чтения (мс)</label><input id="fReadTimeout" type="number" value="5000"></div>
+                <div class="form-group"><label>Таймаут записи (мс)</label><input id="fWriteTimeout" type="number" value="5000"></div>
+            </div>
+            <div class="form-section-title">Переподключение</div>
+            <div class="form-grid">
+                <div class="form-group"><label>Задержка (мс)</label><input id="fReconnectDelay" type="number" min="100" max="60000" step="100" value="1000"></div>
+                <div class="form-group"><label>Макс. попыток</label><input id="fReconnectMaxRetries" type="number" min="1" max="10000" value="10"></div>
+                <div class="form-group"><label>Непрерывное переподключение</label>
+                    <select id="fReconnectContinuous"><option value="false">Нет (остановка по лимиту)</option><option value="true">Да (без остановки)</option></select>
+                </div>
+            </div>
+            <div class="form-section-title">Обработка данных</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Управляющие символы</label>
+                    <select id="fControlCharMode">
+                        <option value="0">Удалять (рекомендуется)</option>
+                        <option value="1">Оставлять (валидация пройдёт)</option>
+                        <option value="2">Оставлять (обычная валидация)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="hideScannerModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveScanner()">
+                    <i data-lucide="check"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ GROUP MODAL ═══════ -->
+    <div class="modal-overlay" id="groupModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="groupModalTitle">Группа</h2>
+                <button class="btn-icon" onclick="hideGroupModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div id="groupModalScanners" style="margin-bottom:16px"></div>
+            <div class="glass-card-header" style="margin-bottom:12px">
+                <h2 style="font-size:14px"><i data-lucide="list"></i> Действия</h2>
+                <button class="btn btn-primary btn-sm" onclick="showAddGroupAction()">
+                    <i data-lucide="plus"></i> Добавить
+                </button>
+            </div>
+            <table class="data-table">
+                <thead><tr><th>Тип</th><th>Включено</th><th>Настройки</th><th></th></tr></thead>
+                <tbody id="groupActionsBody"></tbody>
+            </table>
+            <div id="groupActionsEmpty" class="empty-state" style="padding:24px">
+                <p>Нет действий в этой группе</p>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="hideGroupModal()">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ GROUP SETTINGS MODAL ═══════ -->
+    <div class="modal-overlay" id="groupSettingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Настройки группы</h2>
+                <button class="btn-icon" onclick="hideGroupSettingsModal()"><i data-lucide="x"></i></button>
+            </div>
+            <input type="hidden" id="editGroupIndex" value="-1">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Имя группы</label>
+                    <input id="fGroupName" placeholder="напр. Уведомления Telegram">
+                </div>
+                <div class="form-group">
+                    <label>Включена</label>
+                    <select id="fGroupEnabled"><option value="true">Да</option><option value="false">Нет</option></select>
+                </div>
+            </div>
+            <div class="form-section-title">Привязка к сканерам</div>
+            <div id="groupScannerCheckboxes" class="checkbox-group"></div>
+            <div style="color:var(--color-text-muted);font-size:12px;margin-top:8px">Если ни один не выбран — группа работает со всеми сканерами</div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="hideGroupSettingsModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveGroupSettings()">
+                    <i data-lucide="check"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ ACTION EDITOR MODAL ═══════ -->
+    <div class="modal-overlay" id="actionModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="actionModalTitle">Добавить действие</h2>
+                <button class="btn-icon" onclick="hideActionModal()"><i data-lucide="x"></i></button>
+            </div>
+            <input type="hidden" id="editActionIndex" value="-1">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Тип действия</label>
+                    <select id="fActionType">
+                        <option value="Log">Логирование (Log)</option>
+                        <option value="Replacement">Замена символов (Replacement)</option>
+                        <option value="ClipboardPaste">Вставка в активное окно (ClipboardPaste)</option>
+                        <option value="WindowPaste">Вставка в выбранное окно (WindowPaste)</option>
+                        <option value="Export">Экспорт (Export)</option>
+                        <option value="Telegram">Уведомление Telegram</option>
+                        <option value="Email">Уведомление Email</option>
+                        <option value="DataEnrichment">Обогащение данных</option>
+                        <option value="Validation">Валидация</option>
+                        <option value="Aggregation">Агрегация</option>
+                        <option value="DatabaseQuery">Запрос к БД</option>
+                        <option value="Pause">Пауза (ожидание)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Включено</label>
+                    <select id="fActionEnabled"><option value="true">Да</option><option value="false">Нет</option></select>
+                </div>
+            </div>
+            <div id="actionDescription" class="action-description"></div>
+            <div id="actionSettings" class="form-grid" style="margin-top:14px"></div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="hideActionModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveAction()">
+                    <i data-lucide="check"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ NODE SETTINGS MODAL ═══════ -->
+    <div class="modal-overlay" id="nodeSettingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="nodeSettingsTitle">Настройки узла</h2>
+                <button class="btn-icon" onclick="closeNodeSettingsModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div id="nodeSettingsContent"></div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeNodeSettingsModal()">Закрыть</button>
+                <button class="btn btn-primary" onclick="saveNodeSettingsFromModal()">
+                    <i data-lucide="check"></i> Применить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════ SCENARIO SAVE MODAL ═══════ -->
+    <div class="modal-overlay" id="scenarioSaveModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Сохранить сценарий</h2>
+                <button class="btn-icon" onclick="cancelScenarioSave()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>Имя сценария</label>
+                    <input id="scenarioSaveName" type="text" placeholder="напр. Обработка штрихкодов" maxlength="200">
+                </div>
+                <div class="form-group full">
+                    <label>Описание</label>
+                    <textarea id="scenarioSaveDesc" rows="3" placeholder="Описание назначения сценария (необязательно)" maxlength="2000"></textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="cancelScenarioSave()">Отмена</button>
+                <button class="btn btn-primary" onclick="confirmScenarioSave()">
+                    <i data-lucide="check"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="/js/utils.js"></script>
+    <script src="/js/actions.js"></script>
+    <script src="/js/scanners.js"></script>
+    <script src="/js/logs.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="/js/scenario-editor.js"></script>
+    <script src="/js/scenarios.js"></script>
+    <script src="/js/router.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

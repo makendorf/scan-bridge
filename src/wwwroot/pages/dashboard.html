@@ -1,0 +1,91 @@
+<div class="kpi-grid dashboard-kpi">
+    <div class="kpi-card">
+        <div class="kpi-icon blue"><i data-lucide="scan-barcode"></i></div>
+        <div class="kpi-label">Всего сканеров</div>
+        <div class="kpi-value" id="dashTotalScanners">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon green"><i data-lucide="radio"></i></div>
+        <div class="kpi-label">Активных</div>
+        <div class="kpi-value" id="dashActiveScanners">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon purple"><i data-lucide="hash"></i></div>
+        <div class="kpi-label">Всего сканов</div>
+        <div class="kpi-value" id="dashTotalScans">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon amber"><i data-lucide="calendar-day"></i></div>
+        <div class="kpi-label">Сканов сегодня</div>
+        <div class="kpi-value" id="dashScansToday">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon green"><i data-lucide="check-circle"></i></div>
+        <div class="kpi-label">Успешность</div>
+        <div class="kpi-value" id="dashSuccessRate">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon blue"><i data-lucide="database"></i></div>
+        <div class="kpi-label">Размер БД</div>
+        <div class="kpi-value" id="dashDbSize">—</div>
+    </div>
+</div>
+
+<div class="dashboard-charts">
+    <div class="glass-card dashboard-chart-card">
+        <div class="glass-card-header">
+            <h2><i data-lucide="activity"></i> Активность</h2>
+            <div class="dashboard-period-btns">
+                <button class="btn btn-sm btn-ghost active" data-period="24h" onclick="loadDashActivity('24h')">24ч</button>
+                <button class="btn btn-sm btn-ghost" data-period="7d" onclick="loadDashActivity('7d')">7д</button>
+                <button class="btn btn-sm btn-ghost" data-period="30d" onclick="loadDashActivity('30d')">30д</button>
+            </div>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="activityChart"></canvas>
+        </div>
+    </div>
+    <div class="glass-card dashboard-chart-card dashboard-chart-narrow">
+        <div class="glass-card-header">
+            <h2><i data-lucide="pie-chart"></i> Форматы</h2>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="formatChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="glass-card-header">
+        <h2><i data-lucide="list"></i> Последние сканы</h2>
+        <span class="dashboard-refresh-hint" id="dashLastUpdate"></span>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr><th>Время</th><th>Сканер</th><th>Формат</th><th>Данные</th><th>Статус</th></tr>
+        </thead>
+        <tbody id="dashScansBody"></tbody>
+    </table>
+    <div id="dashScansEmpty" class="empty-state hidden">
+        <i data-lucide="inbox"></i>
+        <p>Нет данных о сканированиях</p>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="glass-card-header">
+        <h2><i data-lucide="radio"></i> Сканеры</h2>
+    </div>
+    <div id="dashScannerCards" class="dashboard-scanner-grid"></div>
+</div>
+
+<div class="glass-card">
+    <div class="glass-card-header">
+        <h2><i data-lucide="alert-triangle"></i> Ошибки переподключения</h2>
+    </div>
+    <div id="dashReconnects" class="dashboard-reconnects"></div>
+    <div id="dashReconnectsEmpty" class="empty-state hidden">
+        <i data-lucide="check-circle"></i>
+        <p>Нет ошибок переподключения</p>
+    </div>
+</div>

@@ -67,19 +67,19 @@ function renderScenarios() {
 /* ── Create Scenario ── */
 function showCreateScenario() {
     editingScenarioId = null;
-    switchPanel('scenario-editor');
-    initScenarioEditor(null);
+    navigateTo('scenario-editor');
 }
 
 /* ── Edit Scenario ── */
+let editingScenarioData = null;
+
 async function editScenario(id) {
     editingScenarioId = id;
     try {
         const res = await fetch(`/api/scenarios/${id}`);
         if (!res.ok) throw new Error('Failed to load scenario');
-        const scenario = await res.json();
-        switchPanel('scenario-editor');
-        initScenarioEditor(scenario);
+        editingScenarioData = await res.json();
+        navigateTo('scenario-editor');
     } catch (e) {
         console.error('Failed to load scenario:', e);
         showToast('Ошибка загрузки сценария', 'error');

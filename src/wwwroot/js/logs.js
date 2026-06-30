@@ -61,17 +61,20 @@ function renderLogs() {
         panel.scrollTop = panel.scrollHeight;
 }
 
-document.getElementById('logPanel').addEventListener('scroll', function() {
-    const panel = this;
-    const atBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 30;
-    if (atBottom) logUserScrolledUp = false;
-    else logUserScrolledUp = true;
-});
-
-document.querySelectorAll('.log-toolbar input').forEach(cb => cb.addEventListener('change', () => {
-    lastRenderedLogCount = 0;
-    renderLogs();
-}));
+function initLogsPage() {
+    const panel = document.getElementById('logPanel');
+    if (panel) {
+        panel.addEventListener('scroll', function() {
+            const atBottom = panel.scrollHeight - panel.scrollTop - panel.clientHeight < 30;
+            if (atBottom) logUserScrolledUp = false;
+            else logUserScrolledUp = true;
+        });
+    }
+    document.querySelectorAll('.log-toolbar input').forEach(cb => cb.addEventListener('change', () => {
+        lastRenderedLogCount = 0;
+        renderLogs();
+    }));
+}
 
 async function clearLogs() {
     await fetch('/api/logs', { method: 'DELETE' });

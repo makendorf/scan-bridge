@@ -150,17 +150,17 @@
     font-size: 12px; color: var(--color-text-dim);
     text-transform: uppercase; letter-spacing: 0.3px; font-weight: 500;
 }
-.form-group input, .form-group select {
+.form-group input, .form-group select, .form-group textarea {
     background: var(--color-bg); border: 1px solid var(--color-border);
     color: var(--color-text); padding: 10px 12px; border-radius: var(--radius-sm);
     font-size: 14px; font-family: inherit; outline: none;
     transition: border-color var(--transition);
 }
-.form-group input:focus, .form-group select:focus {
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--color-primary-dim);
 }
-.form-group input::placeholder { color: var(--color-text-muted); }
+.form-group input::placeholder, .form-group textarea::placeholder { color: var(--color-text-muted); }
 .form-actions {
     display: flex; gap: 10px; margin-top: 20px;
     justify-content: flex-end; padding-top: 16px;

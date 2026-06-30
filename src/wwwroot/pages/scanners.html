@@ -1,0 +1,65 @@
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-icon blue"><i data-lucide="scan-barcode"></i></div>
+        <div class="kpi-label">Сканеров</div>
+        <div class="kpi-value" id="kpiScanners">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon green"><i data-lucide="check-circle"></i></div>
+        <div class="kpi-label">Активных</div>
+        <div class="kpi-value" id="kpiActive">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon amber"><i data-lucide="settings"></i></div>
+        <div class="kpi-label">Действий</div>
+        <div class="kpi-value" id="kpiActions">0</div>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="settings-bar">
+        <div class="group">
+            <label>Переподключение:</label>
+            <select id="reconnectMode" onchange="saveReconnectMode()">
+                <option value="single">Только изменённый сканер</option>
+                <option value="all">Все сканеры</option>
+            </select>
+        </div>
+        <div class="sep"></div>
+        <div class="group">
+            <label>Задержка:</label>
+            <input id="reconnectDelay" type="number" min="100" max="60000" step="100" value="1000" onchange="saveReconnectConfig()"> мс
+        </div>
+        <div class="group">
+            <label>Попыток:</label>
+            <input id="reconnectMaxRetries" type="number" min="1" max="10000" value="10" onchange="saveReconnectConfig()">
+        </div>
+        <div class="group">
+            <label><input type="checkbox" id="reconnectContinuous" onchange="saveReconnectConfig()"> Непрерывно</label>
+        </div>
+        <span class="hint">— применяется ко всем сканерам</span>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="glass-card-header">
+        <h2><i data-lucide="list"></i> Сканеры</h2>
+        <button class="btn btn-primary" onclick="showAddScanner()">
+            <i data-lucide="plus"></i> Добавить сканер
+        </button>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Имя</th><th>Порт</th><th>Скорость</th>
+                <th>Данные / Чётность / Стоп</th><th>Поток</th>
+                <th>Переподключение</th><th></th>
+            </tr>
+        </thead>
+        <tbody id="scannersBody"></tbody>
+    </table>
+    <div id="emptyState" class="empty-state hidden">
+        <i data-lucide="scan-barcode"></i>
+        <p>Сканеры не настроены</p>
+    </div>
+</div>

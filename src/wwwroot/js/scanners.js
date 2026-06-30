@@ -4,16 +4,18 @@ let scanners = [];
 
 /* ── Reconnect Settings ── */
 async function loadSettings() {
+    const el = (id) => document.getElementById(id);
+    if (!el('reconnectMode')) return;
     const [modeRes, configRes] = await Promise.all([
         fetch('/api/settings/reconnect'),
         fetch('/api/settings/reconnect/config')
     ]);
     const modeData = await modeRes.json();
     const configData = await configRes.json();
-    document.getElementById('reconnectMode').value = modeData.mode;
-    document.getElementById('reconnectDelay').value = configData.delayMs;
-    document.getElementById('reconnectMaxRetries').value = configData.maxRetries;
-    document.getElementById('reconnectContinuous').checked = configData.continuous;
+    el('reconnectMode').value = modeData.mode;
+    el('reconnectDelay').value = configData.delayMs;
+    el('reconnectMaxRetries').value = configData.maxRetries;
+    el('reconnectContinuous').checked = configData.continuous;
     updateMaxRetriesState();
 }
 
@@ -60,6 +62,7 @@ async function load() {
 function render() {
     const tbody = document.getElementById('scannersBody');
     const empty = document.getElementById('emptyState');
+    if (!tbody || !empty) return;
     if (scanners.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
     tbody.innerHTML = scanners.map((s, i) => {

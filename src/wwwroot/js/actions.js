@@ -217,6 +217,7 @@ async function loadGroups() {
 function renderGroupCards() {
     const container = document.getElementById('groupCards');
     const empty = document.getElementById('groupsEmpty');
+    if (!container || !empty) return;
     if (postScanGroups.length === 0) { container.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
     container.innerHTML = postScanGroups.map((g, i) => {
@@ -422,11 +423,15 @@ async function saveGroups() {
 }
 
 /* ── Action Settings Editor (shared) ── */
-function updateActionSettings(type, existing) {
-    const container = document.getElementById('actionSettings');
-    const descEl = document.getElementById('actionDescription');
+let _activeSettingsContainer = 'actionSettings';
+
+function updateActionSettings(type, existing, containerId) {
+    const targetId = containerId || 'actionSettings';
+    _activeSettingsContainer = targetId;
+    const container = document.getElementById(targetId);
+    const descEl = containerId ? null : document.getElementById('actionDescription');
     const def = ACTION_TYPES[type];
-    descEl.innerHTML = def?.description ? `<strong>${esc(def.name)}</strong> — ${esc(def.description)}` : '';
+    if (descEl) descEl.innerHTML = def?.description ? `<strong>${esc(def.name)}</strong> — ${esc(def.description)}` : '';
     if (!def || def.settings.length === 0) { container.innerHTML = ''; return; }
     container.innerHTML = def.settings.map(s => {
         if (s.type === 'replacements') {
@@ -435,7 +440,7 @@ function updateActionSettings(type, existing) {
             try { replacementRules = JSON.parse(json); } catch { replacementRules = []; }
             return `<div class="form-group full" data-showwhen="${s.showWhen || ''}">
                 <label>${s.label}</label>
-                <div id="replacementsContainer"></div>
+                <div class="replacements-container"></div>
                 <button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="addReplacement()"><i data-lucide="plus" style="width:12px;height:12px"></i> Добавить замену</button>
             </div>`;
         }
@@ -448,7 +453,7 @@ function updateActionSettings(type, existing) {
             }
             return `<div class="form-group full" data-showwhen="${s.showWhen || ''}">
                 <label>${s.label}</label>
-                <div id="tagsContainer"></div>
+                <div class="tags-container"></div>
                 <button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="addTag()"><i data-lucide="plus" style="width:12px;height:12px"></i> Добавить тег</button>
             </div>`;
         }
@@ -458,10 +463,10 @@ function updateActionSettings(type, existing) {
                 const lbl = s.optionLabels?.[o] || o;
                 return `<option value="${o}" ${o === val ? 'selected' : ''}>${lbl}</option>`;
             }).join('');
-            return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}</label><select id="set_${s.key}" onchange="onSettingChange()">${opts}</select></div>`;
+            return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}</label><select class="set-field" data-key="${s.key}" onchange="onSettingChange()">${opts}</select></div>`;
         }
         const hint = s.hint ? `<span class="hint-trigger"><i data-lucide="help-circle"></i><div class="hint-popup">${esc(s.hint)}</div></span>` : '';
-        return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}${hint}</label><input id="set_${s.key}" type="${s.type}" value="${esc(val)}"></div>`;
+        return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}${hint}</label><input class="set-field" data-key="${s.key}" type="${s.type}" value="${esc(val)}"></div>`;
     }).join('');
     renderReplacements();
     renderTags();
@@ -472,14 +477,16 @@ function updateActionSettings(type, existing) {
 function onSettingChange() { applyShowWhen(); }
 
 function applyShowWhen() {
-    document.querySelectorAll('#actionSettings [data-showwhen]').forEach(g => {
+    const container = document.getElementById(_activeSettingsContainer);
+    if (!container) return;
+    container.querySelectorAll('[data-showwhen]').forEach(g => {
         const rule = g.getAttribute('data-showwhen');
         if (!rule) { g.style.display = ''; return; }
         const match = rule.match(/^(\w+)=(.+)$/);
         if (!match) { g.style.display = ''; return; }
         const [, key, values] = match;
         const allowed = values.split('|');
-        const el = document.getElementById('set_' + key);
+        const el = container.querySelector(`.set-field[data-key="${key}"]`);
         const current = el ? el.value : '';
         g.style.display = allowed.includes(current) ? '' : 'none';
     });
@@ -487,7 +494,7 @@ function applyShowWhen() {
 
 /* ── Replacements ── */
 function renderReplacements() {
-    const container = document.getElementById('replacementsContainer');
+    const container = document.querySelector(`#${_activeSettingsContainer} .replacements-container`);
     if (!container) return;
     if (replacementRules.length === 0) {
         container.innerHTML = '<div style="color:var(--color-text-muted);font-size:12px;padding:6px 0">Нет замен</div>';
@@ -522,7 +529,7 @@ function collectReplacements() {
 
 /* ── Tags ── */
 function renderTags() {
-    const container = document.getElementById('tagsContainer');
+    const container = document.querySelector(`#${_activeSettingsContainer} .tags-container`);
     if (!container) return;
     if (tagRules.length === 0) {
         container.innerHTML = '<div style="color:var(--color-text-muted);font-size:12px;padding:6px 0">Нет тегов</div>';
@@ -566,11 +573,15 @@ function collectTags() {
 function getActionSettings(type) {
     const def = ACTION_TYPES[type];
     if (!def) return {};
+    const container = document.getElementById(_activeSettingsContainer);
     const settings = {};
     def.settings.forEach(s => {
         if (s.type === 'replacements') { settings[s.key] = JSON.stringify(collectReplacements()); }
         else if (s.type === 'tags') { settings[s.key] = JSON.stringify(collectTags()); }
-        else { const el = document.getElementById('set_' + s.key); if (el) settings[s.key] = el.value; }
+        else {
+            const el = container ? container.querySelector(`.set-field[data-key="${s.key}"]`) : document.getElementById('set_' + s.key);
+            if (el) settings[s.key] = el.value;
+        }
     });
     return settings;
 }
