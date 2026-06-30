@@ -115,13 +115,33 @@ internal static class Win32Clipboard
 
     internal static void SimulatePaste()
     {
+        // 1. КРИТИЧЕСКАЯ ПРОВЕРКА: Размер структуры должен быть строго 40 (x64) или 28 (x86)
+        int size = Marshal.SizeOf<INPUT>();
+        if (size != 40 && size != 28)
+        {
+            throw new InvalidOperationException($"Неверный размер структуры INPUT: {size}. SendInput не сработает.");
+        }
+
         var inputs = new INPUT[4];
-        inputs[0] = CreateKeyInput(0x11, KEYEVENTF_EXTENDEDKEY);
-        inputs[1] = CreateKeyInput(0x56, 0);
-        inputs[2] = CreateKeyInput(0x56, KEYEVENTF_KEYUP);
-        inputs[3] = CreateKeyInput(0x11, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP);
-        SendInput(4, inputs, Marshal.SizeOf<INPUT>());
-        Thread.Sleep(50);
+
+        // ИСПРАВЛЕНИЕ: Убираем KEYEVENTF_EXTENDEDKEY для левого Ctrl. 
+        inputs[0] = CreateKeyInput(0x11, 0); // Ctrl Down
+        inputs[1] = CreateKeyInput(0x56, 0); // V Down
+        inputs[2] = CreateKeyInput(0x56, KEYEVENTF_KEYUP); // V Up
+        inputs[3] = CreateKeyInput(0x11, KEYEVENTF_KEYUP); // Ctrl Up
+
+        // 2. ПРОВЕРКА РЕЗУЛЬТАТА: SendInput возвращает количество успешно отправленных событий
+        uint sent = SendInput((uint)inputs.Length, inputs, size);
+
+        if (sent == 0)
+        {
+            int error = Marshal.GetLastWin32Error();
+            // Если вылетит здесь, смотрите код ошибки ниже в чеклисте
+            throw new InvalidOperationException($"SendInput вернул 0. Код ошибки Windows: {error}");
+        }
+
+        // 3. Увеличиваем задержку, чтобы "тяжелые" приложения успели обработать вставку
+        Thread.Sleep(100);
     }
 
     internal static void SimulateTyping(string text)
