@@ -1,6 +1,7 @@
 /* ── ScanBridge Utils ── */
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+const escapeHtml = esc;
 
 /* ── Modal Helpers ── */
 function openModal(id) {
@@ -22,6 +23,7 @@ function toast(msg, isError) {
     document.getElementById('toastContainer').appendChild(t);
     setTimeout(() => t.remove(), 3000);
 }
+const showToast = toast;
 
 /* ── Theme Toggle ── */
 function getTheme() { return localStorage.getItem('scanbridge-theme') || 'dark'; }

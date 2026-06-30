@@ -50,6 +50,21 @@ public class AppDbContext : DbContext
     public DbSet<ReconnectEvent> ReconnectEvents => Set<ReconnectEvent>();
 
     /// <summary>
+    /// Таблица визуальных сценариев.
+    /// </summary>
+    public DbSet<Scenario> Scenarios => Set<Scenario>();
+
+    /// <summary>
+    /// Таблица узлов сценариев.
+    /// </summary>
+    public DbSet<ScenarioNode> ScenarioNodes => Set<ScenarioNode>();
+
+    /// <summary>
+    /// Таблица связей между узлами сценариев.
+    /// </summary>
+    public DbSet<ScenarioConnection> ScenarioConnections => Set<ScenarioConnection>();
+
+    /// <summary>
     /// Создаёт экземпляр контекста базы данных.
     /// </summary>
     /// <param name="options">Параметры подключения к БД.</param>
@@ -122,6 +137,34 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.ScannerName);
             e.Property(x => x.ScannerName).HasMaxLength(100);
             e.Property(x => x.ErrorMessage).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<Scenario>(e =>
+        {
+            e.HasIndex(x => x.Name).IsUnique();
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Description).HasMaxLength(2000);
+            e.Property(x => x.ScannerNamesJson).HasMaxLength(4000);
+        });
+
+        modelBuilder.Entity<ScenarioNode>(e =>
+        {
+            e.HasIndex(x => x.ScenarioId);
+            e.Property(x => x.NodeId).HasMaxLength(50);
+            e.Property(x => x.Type).HasMaxLength(50);
+            e.Property(x => x.SettingsJson).HasMaxLength(4000);
+            e.Property(x => x.ActionType).HasMaxLength(100);
+            e.Ignore(x => x.Scenario);
+        });
+
+        modelBuilder.Entity<ScenarioConnection>(e =>
+        {
+            e.HasIndex(x => x.ScenarioId);
+            e.Property(x => x.SourceNodeId).HasMaxLength(50);
+            e.Property(x => x.TargetNodeId).HasMaxLength(50);
+            e.Property(x => x.SourcePort).HasMaxLength(50);
+            e.Property(x => x.TargetPort).HasMaxLength(50);
+            e.Ignore(x => x.Scenario);
         });
     }
 }

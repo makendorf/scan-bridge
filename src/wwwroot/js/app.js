@@ -12,7 +12,8 @@ function updateStats() {
 /* ── Navigation ── */
 function switchPanel(name) {
     document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-    document.querySelector(`.sidebar-link[data-panel="${name}"]`).classList.add('active');
+    const sidebarLink = document.querySelector(`.sidebar-link[data-panel="${name}"]`);
+    if (sidebarLink) sidebarLink.classList.add('active');
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
     if (name === 'logs') { loadLogs(); startLogPolling(); stopDashPolling(); }
@@ -20,6 +21,8 @@ function switchPanel(name) {
     if (name === 'actions') { loadGroups(); stopDashPolling(); }
     if (name === 'scanners') { load(); loadSettings(); stopDashPolling(); }
     if (name === 'dashboard') { loadDashboard(); startDashPolling(); }
+    if (name === 'scenarios') { loadScenarios(); stopDashPolling(); }
+    if (name === 'scenario-editor') { stopDashPolling(); }
     closeSidebar();
 }
 

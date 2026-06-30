@@ -8,6 +8,7 @@ using ScanBridge.Data.Entities;
 using ScanBridge.Models;
 using ScanBridge.Parsers;
 using ScanBridge.Services;
+using ScanBridge.Services.VisualScripting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +37,8 @@ builder.Services.AddSingleton<Func<SerialPortConfig, ReconnectConfig?, SerialPor
 builder.Services.AddSingleton<ScannerManager>();
 builder.Services.AddSingleton<ScanTracker>();
 builder.Services.AddSingleton<ScanHistoryService>();
+builder.Services.AddSingleton<ScenarioService>();
+builder.Services.AddSingleton<ScenarioExecutor>();
 
 if (OperatingSystem.IsWindows())
 {
@@ -100,6 +103,12 @@ using (var scope = app.Services.CreateScope())
         .AsSplitQuery()
         .ToList();
     postScanManager.Configure(groupConfigs);
+
+    // Загрузка визуальных сценариев
+    var scenarioService = app.Services.GetRequiredService<ScenarioService>();
+    var scenarioExecutor = app.Services.GetRequiredService<ScenarioExecutor>();
+    var scenarioConfigs = scenarioService.GetAll();
+    postScanManager.ConfigureScenarios(scenarioConfigs, scenarioExecutor);
 }
 
 List<SerialPortConfig> ReadScanners()
@@ -119,6 +128,7 @@ app.MapPortEndpoints();
 app.MapPostScanEndpoints(postScanManager);
 app.MapSettingsEndpoints(manager, ReadScanners);
 app.MapDashboardEndpoints(manager);
+app.MapScenarioEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
