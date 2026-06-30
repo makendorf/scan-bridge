@@ -23,9 +23,14 @@ logs/
 
 ## Database
 *.db
+*.db-shm
+*.db-wal
 
 ## Build artifacts
 publish/
+
+## Patchnotes (local only)
+patchnotes/
 
 ## OS
 Thumbs.db
