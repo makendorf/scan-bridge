@@ -46,6 +46,17 @@ const VS_NODE_TEMPLATES = {
                 <div class="vs-condition-display" id="cond-display">настройте условие</div>
             </div>
         </div>`,
+    Fork: () => `
+        <div class="vs-node vs-node-fork">
+            <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="git-merge"></i></span> Ветвление</div>
+        </div>`,
+    While: () => `
+        <div class="vs-node vs-node-while">
+            <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="repeat"></i></span> Цикл</div>
+            <div class="vs-node-body">
+                <div class="vs-condition-display">настройте условие</div>
+            </div>
+        </div>`,
     End: () => `
         <div class="vs-node vs-node-end">
             <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="square"></i></span> Конец</div>
@@ -139,7 +150,7 @@ function importScenarioToDrawflow(scenario) {
     // Add nodes
     scenario.nodes.forEach(node => {
         const inputCount = node.type === 'Start' ? 0 : 1;
-        const outputCount = node.type === 'Condition' ? 2 : (node.type === 'End' ? 0 : 1);
+        const outputCount = node.type === 'Condition' || node.type === 'While' ? 2 : (node.type === 'Fork' ? 3 : (node.type === 'End' ? 0 : 1));
         const template = VS_NODE_TEMPLATES[node.type];
         if (!template) return;
         const nodeSettings = node.settings || {};
@@ -187,7 +198,7 @@ function setupPaletteDragDrop() {
             const y = e.clientY - rect.top + drawflowContainer.parentElement.scrollTop;
 
             const inputCount = type === 'Start' ? 0 : 1;
-            const outputCount = type === 'Condition' ? 2 : (type === 'End' ? 0 : 1);
+            const outputCount = type === 'Condition' || type === 'While' ? 2 : (type === 'Fork' ? 3 : (type === 'End' ? 0 : 1));
 
             drawflowEditor.addNode(
                 type,
@@ -289,6 +300,22 @@ function openNodeSettingsModal(id) {
                 </div>
             </div>
         `;
+    } else if (nodeClass === 'While') {
+        title.textContent = 'Настройки: Цикл';
+        const settings = getDrawflowNodeSettings(id);
+        let conditions = [];
+        try { conditions = JSON.parse(settings.conditions || '[]'); } catch(e) { conditions = []; }
+        if (conditions.length === 0) {
+            conditions = [{ field: 'data', operator: 'contains', value: '' }];
+        }
+        content.innerHTML = `
+            <div class="form-section-title">Условия цикла (все должны быть истинны)</div>
+            <div id="whileConditions"></div>
+            <button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="addWhileCondition()">
+                <i data-lucide="plus" style="width:12px;height:12px"></i> Добавить условие
+            </button>
+        `;
+        renderWhileConditions(conditions);
     } else {
         title.textContent = `Настройки: ${nodeClass}`;
         content.innerHTML = `<p class="hint">Настройки для типа «${escapeHtml(nodeClass)}» отсутствуют</p>`;
@@ -340,21 +367,81 @@ function saveNodeSettingsFromUI(id) {
     const isAction = ACTION_TYPES.hasOwnProperty(nodeClass);
 
     if (isAction) {
-        // Use shared getActionSettings for action nodes
         _activeSettingsContainer = 'nodeActionSettings';
         settings = getActionSettings(nodeClass);
+    } else if (nodeClass === 'While') {
+        settings = {};
+        document.querySelectorAll('#nodeSettingsContent .vs-setting').forEach(el => {
+            settings[el.dataset.key] = el.value;
+        });
+        settings.conditions = JSON.stringify(collectWhileConditions());
     } else {
-        // For Condition and other nodes, use the old selector
         settings = {};
         document.querySelectorAll('#nodeSettingsContent .vs-setting').forEach(el => {
             settings[el.dataset.key] = el.value;
         });
     }
 
-    // Only update if we got settings (not empty object from failed lookup)
     if (Object.keys(settings).length > 0) {
         drawflowEditor.updateNodeDataFromId(parseInt(id), { settings });
     }
+}
+
+/* ── While Conditions Management ── */
+let whileConditions = [];
+
+function renderWhileConditions(conditions) {
+    whileConditions = conditions;
+    const container = document.getElementById('whileConditions');
+    if (!container) return;
+
+    container.innerHTML = conditions.map((c, i) => `
+        <div class="rule-row" style="margin-bottom:6px">
+            <select class="while-field" data-index="${i}" style="flex:1">
+                <option value="data" ${c.field === 'data' ? 'selected' : ''}>Данные</option>
+                <option value="raw" ${c.field === 'raw' ? 'selected' : ''}>Raw</option>
+                <option value="format" ${c.field === 'format' ? 'selected' : ''}>Формат</option>
+                <option value="scanner" ${c.field === 'scanner' ? 'selected' : ''}>Сканер</option>
+                <option value="isValid" ${c.field === 'isValid' ? 'selected' : ''}>Валиден</option>
+            </select>
+            <select class="while-operator" data-index="${i}" style="flex:1">
+                <option value="equals" ${c.operator === 'equals' ? 'selected' : ''}>Равно</option>
+                <option value="notEquals" ${c.operator === 'notEquals' ? 'selected' : ''}>Не равно</option>
+                <option value="contains" ${c.operator === 'contains' ? 'selected' : ''}>Содержит</option>
+                <option value="notContains" ${c.operator === 'notContains' ? 'selected' : ''}>Не содержит</option>
+                <option value="regex" ${c.operator === 'regex' ? 'selected' : ''}>Regex</option>
+                <option value="greaterThan" ${c.operator === 'greaterThan' ? 'selected' : ''}>Больше</option>
+                <option value="lessThan" ${c.operator === 'lessThan' ? 'selected' : ''}>Меньше</option>
+                <option value="isValid" ${c.operator === 'isValid' ? 'selected' : ''}>Валиден</option>
+            </select>
+            <input class="while-value" data-index="${i}" type="text" value="${escapeHtml(c.value || '')}" placeholder="Значение" style="flex:1">
+            <button class="btn-icon danger" onclick="removeWhileCondition(${i})"><i data-lucide="x"></i></button>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+function addWhileCondition() {
+    whileConditions.push({ field: 'data', operator: 'contains', value: '' });
+    renderWhileConditions(whileConditions);
+}
+
+function removeWhileCondition(index) {
+    whileConditions.splice(index, 1);
+    renderWhileConditions(whileConditions);
+}
+
+function collectWhileConditions() {
+    const container = document.getElementById('whileConditions');
+    if (!container) return [];
+    const result = [];
+    container.querySelectorAll('.rule-row').forEach((row, i) => {
+        const field = row.querySelector('.while-field')?.value || 'data';
+        const operator = row.querySelector('.while-operator')?.value || 'contains';
+        const value = row.querySelector('.while-value')?.value || '';
+        result.push({ field, operator, value });
+    });
+    return result;
 }
 
 /* ── Save Scenario from Editor ── */

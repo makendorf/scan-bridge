@@ -46,7 +46,7 @@ public class ScenarioExecutor
             var nodeType = nodeConfig.Type;
 
             // Action nodes: type is either "Action" with ActionType, or the action type directly (e.g. "Log")
-            var actionType = nodeConfig.ActionType ?? (nodeType != "Start" && nodeType != "Condition" && nodeType != "End" ? nodeType : null);
+            var actionType = nodeConfig.ActionType ?? (nodeType != "Start" && nodeType != "Condition" && nodeType != "End" && nodeType != "Fork" && nodeType != "While" ? nodeType : null);
 
             if (actionType != null)
             {
@@ -121,6 +121,13 @@ public class ScenarioExecutor
                     context.Variables["lastCondition"] = result;
                     break;
 
+                case "While":
+                    var whileSettings = node.Config.Settings ?? new Dictionary<string, string>();
+                    var conditionsJson = whileSettings.GetValueOrDefault("conditions", "[]");
+                    var whileResult = ConditionEvaluator.EvaluateMultiple(conditionsJson, context.Scan);
+                    context.Variables["lastCondition"] = whileResult;
+                    break;
+
                 case "End":
                     return;
 
@@ -135,10 +142,12 @@ public class ScenarioExecutor
 
             // Определить следующие узлы
             List<CompiledNode> nextNodes;
-            if (node.Config.Type == "Condition")
+            if (node.Config.Type == "Condition" || node.Config.Type == "While")
             {
                 var conditionResult = context.Variables.TryGetValue("lastCondition", out var val) && val is bool b && b;
-                var portName = conditionResult ? "output_1" : "output_2";
+                var portName = node.Config.Type == "While"
+                    ? (conditionResult ? "output_1" : "output_2")
+                    : (conditionResult ? "output_1" : "output_2");
 
                 if (node.PortConnections.TryGetValue(portName, out var portNodes) && portNodes.Count > 0)
                 {
@@ -146,7 +155,6 @@ public class ScenarioExecutor
                 }
                 else
                 {
-                    // Fallback: если порт не найден, берём первый доступный
                     nextNodes = node.NextNodes.Take(1).ToList();
                 }
             }
@@ -159,6 +167,30 @@ public class ScenarioExecutor
             foreach (var next in nextNodes)
             {
                 await ExecuteNodeAsync(next, context);
+            }
+
+            // Для While: если условие истинно, вернуться к телу цикла
+            if (node.Config.Type == "While")
+            {
+                var whileCondition = context.Variables.TryGetValue("lastCondition", out var wv) && wv is bool wb && wb;
+                if (whileCondition)
+                {
+                    // Найти выход output_1 (тело цикла) и выполнить его снова
+                    if (node.PortConnections.TryGetValue("output_1", out var loopNodes) && loopNodes.Count > 0)
+                    {
+                        // Защита от бесконечного цикла — максимум 100 итераций
+                        var whileKey = $"while_{node.Config.NodeId}";
+                        var iterations = context.Variables.TryGetValue(whileKey, out var iv) && iv is int intVal ? intVal : 0;
+                        if (iterations < 100)
+                        {
+                            context.Variables[whileKey] = iterations + 1;
+                            foreach (var loopNode in loopNodes)
+                            {
+                                await ExecuteNodeAsync(loopNode, context);
+                            }
+                        }
+                    }
+                }
             }
         }
         catch (OperationCanceledException)

@@ -1,19 +1,17 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using ScanBridge.Models;
 
 namespace ScanBridge.Services.VisualScripting;
 
 /// <summary>
-/// Простой evaluator для Condition узлов.
+/// Простой evaluator для Condition и While узлов.
 /// </summary>
 public static class ConditionEvaluator
 {
     /// <summary>
-    /// Оценивает условие на основе настроек узла и результата сканирования.
+    /// Оценивает单一 условие.
     /// </summary>
-    /// <param name="settings">Настройки условия (operator, field, value).</param>
-    /// <param name="scan">Результат сканирования.</param>
-    /// <returns>true или false.</returns>
     public static bool Evaluate(Dictionary<string, string> settings, ScanResult scan)
     {
         if (!settings.TryGetValue("operator", out var op))
@@ -22,6 +20,36 @@ public static class ConditionEvaluator
         var field = settings.GetValueOrDefault("field", "data");
         var value = settings.GetValueOrDefault("value", "");
 
+        return EvaluateSingle(field, op, value, scan);
+    }
+
+    /// <summary>
+    /// Оценивает несколько условий для While (все должны быть истинны — AND-логика).
+    /// </summary>
+    public static bool EvaluateMultiple(string conditionsJson, ScanResult scan)
+    {
+        if (string.IsNullOrEmpty(conditionsJson)) return false;
+
+        try
+        {
+            var conditions = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(conditionsJson);
+            if (conditions == null || conditions.Count == 0) return false;
+
+            foreach (var condition in conditions)
+            {
+                if (!Evaluate(condition, scan))
+                    return false;
+            }
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool EvaluateSingle(string field, string op, string value, ScanResult scan)
+    {
         var data = field switch
         {
             "data" => scan.ParsedData ?? "",
