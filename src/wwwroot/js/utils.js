@@ -16,9 +16,9 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 });
 
 /* ── Toast ── */
-function toast(msg, isError) {
+function toast(msg, type) {
     const t = document.createElement('div');
-    t.className = 'toast ' + (isError ? 'toast-error' : 'toast-success');
+    t.className = 'toast ' + (type === 'error' ? 'toast-error' : 'toast-success');
     t.textContent = msg;
     document.getElementById('toastContainer').appendChild(t);
     setTimeout(() => t.remove(), 3000);

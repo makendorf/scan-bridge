@@ -99,6 +99,15 @@ public class PostScanManager
     }
 
     /// <summary>
+    /// Перезагружает сценарии из базы данных.
+    /// </summary>
+    public virtual void ReloadScenarios(ScenarioService scenarioService, ScenarioExecutor executor)
+    {
+        var configs = scenarioService.GetAllWithGraph();
+        ConfigureScenarios(configs, executor);
+    }
+
+    /// <summary>
     /// Выполняет все подходящие группы и сценарии для результата сканирования.
     /// Группы и сценарии выполняются параллельно.
     /// Действия внутри группы — последовательно.

@@ -573,13 +573,13 @@ function collectTags() {
 function getActionSettings(type) {
     const def = ACTION_TYPES[type];
     if (!def) return {};
-    const container = document.getElementById(_activeSettingsContainer);
+    const container = document.getElementById(_activeSettingsContainer) || document.getElementById('nodeActionSettings') || document.getElementById('actionSettings');
     const settings = {};
     def.settings.forEach(s => {
         if (s.type === 'replacements') { settings[s.key] = JSON.stringify(collectReplacements()); }
         else if (s.type === 'tags') { settings[s.key] = JSON.stringify(collectTags()); }
         else {
-            const el = container ? container.querySelector(`.set-field[data-key="${s.key}"]`) : document.getElementById('set_' + s.key);
+            const el = container ? container.querySelector(`.set-field[data-key="${s.key}"]`) : null;
             if (el) settings[s.key] = el.value;
         }
     });

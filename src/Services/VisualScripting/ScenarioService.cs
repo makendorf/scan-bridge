@@ -44,6 +44,51 @@ public class ScenarioService
     }
 
     /// <summary>
+    /// Получить все включённые сценарии с полным графом (для выполнения).
+    /// </summary>
+    public List<ScenarioConfig> GetAllWithGraph()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var scenarios = db.Scenarios
+            .Where(s => s.Enabled)
+            .OrderBy(s => s.SortOrder)
+            .ToList();
+
+        return scenarios.Select(s => new ScenarioConfig
+        {
+            Id = s.Id,
+            Name = s.Name,
+            Description = s.Description,
+            Enabled = s.Enabled,
+            ScannerNames = JsonSerializer.Deserialize<List<string>>(s.ScannerNamesJson) ?? new(),
+            Nodes = db.ScenarioNodes
+                .Where(n => n.ScenarioId == s.Id)
+                .Select(n => new ScenarioNodeConfig
+                {
+                    NodeId = n.NodeId,
+                    Type = n.Type,
+                    PositionX = n.PositionX,
+                    PositionY = n.PositionY,
+                    Settings = JsonSerializer.Deserialize<Dictionary<string, string>>(n.SettingsJson) ?? new(),
+                    ActionType = n.ActionType
+                })
+                .ToList(),
+            Connections = db.ScenarioConnections
+                .Where(c => c.ScenarioId == s.Id)
+                .Select(c => new ScenarioConnectionConfig
+                {
+                    SourceNodeId = c.SourceNodeId,
+                    TargetNodeId = c.TargetNodeId,
+                    SourcePort = c.SourcePort,
+                    TargetPort = c.TargetPort
+                })
+                .ToList()
+        }).ToList();
+    }
+
+    /// <summary>
     /// Получить сценарий по ID с графом.
     /// </summary>
     public ScenarioConfig? GetById(int id)

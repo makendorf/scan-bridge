@@ -107,7 +107,7 @@ using (var scope = app.Services.CreateScope())
     // Загрузка визуальных сценариев
     var scenarioService = app.Services.GetRequiredService<ScenarioService>();
     var scenarioExecutor = app.Services.GetRequiredService<ScenarioExecutor>();
-    var scenarioConfigs = scenarioService.GetAll();
+    var scenarioConfigs = scenarioService.GetAllWithGraph();
     postScanManager.ConfigureScenarios(scenarioConfigs, scenarioExecutor);
 }
 
@@ -129,6 +129,9 @@ app.UseStaticFiles(new StaticFileOptions
         ctx.Context.Response.Headers.Append("Expires", "0");
     }
 });
+
+// Fallback: serve layout.html for any non-API, non-static-file route
+app.MapFallbackToFile("layout.html");
 
 app.MapScannerEndpoints(manager, ReadScanners);
 app.MapLogEndpoints();

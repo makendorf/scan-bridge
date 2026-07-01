@@ -130,6 +130,7 @@ function importScenarioToDrawflow(scenario) {
         const outputCount = node.type === 'Condition' ? 2 : (node.type === 'End' ? 0 : 1);
         const template = VS_NODE_TEMPLATES[node.type];
         if (!template) return;
+        const nodeSettings = node.settings || {};
         const id = drawflowEditor.addNode(
             node.type,
             inputCount,
@@ -137,7 +138,7 @@ function importScenarioToDrawflow(scenario) {
             node.positionX,
             node.positionY,
             node.type,
-            {},
+            { settings: nodeSettings },
             template()
         );
         nodeMap[node.nodeId] = id.toString();
@@ -338,7 +339,10 @@ function saveNodeSettingsFromUI(id) {
         });
     }
 
-    drawflowEditor.updateNodeDataFromId(parseInt(id), { settings });
+    // Only update if we got settings (not empty object from failed lookup)
+    if (Object.keys(settings).length > 0) {
+        drawflowEditor.updateNodeDataFromId(parseInt(id), { settings });
+    }
 }
 
 /* ── Save Scenario from Editor ── */
@@ -346,6 +350,13 @@ let pendingScenarioData = null;
 
 function saveScenarioFromEditor() {
     if (!drawflowEditor) return;
+
+    // Save any open node settings first
+    if (modalNodeId) {
+        saveNodeSettingsFromUI(modalNodeId);
+        closeModal('nodeSettingsModal');
+        modalNodeId = null;
+    }
 
     const exportData = drawflowEditor.export();
     pendingScenarioData = exportDrawflowToScenario(exportData);
@@ -431,11 +442,10 @@ function exportDrawflowToScenario(exportData) {
 
         nodes.push({
             nodeId: id,
-            type: isAction ? 'Action' : nodeClass,
+            type: nodeClass,
             positionX: node.pos_x,
             positionY: node.pos_y,
             settings: settings,
-            actionTypes: actionType,
             ActionType: actionType
         });
 
