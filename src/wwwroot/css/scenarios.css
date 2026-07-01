@@ -351,6 +351,21 @@
 }
 
 /* Node Type Colors — using site variables */
+.vs-node-scanner .vs-node-header {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10B981;
+}
+
+.vs-node-scanner .vs-node-body {
+    text-align: center;
+}
+
+.vs-scanner-display {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 2px 0;
+}
+
 .vs-node-start .vs-node-header {
     background: var(--color-secondary-dim);
     color: var(--color-success);

@@ -22,7 +22,9 @@ builder.Host.UseSerilog();
 builder.Services.AddSingleton<LogCollector>();
 builder.Services.AddSingleton<IBarcodeParser, SimpleBarcodeParser>();
 builder.Services.AddSingleton<IPostScanActionFactory, PostScanActionFactory>();
+builder.Services.AddSingleton<ScanDispatcher>();
 builder.Services.AddSingleton<PostScanManager>();
+builder.Services.AddSingleton<GroupManager>();
 builder.Services.AddSingleton<ScanProcessorService>();
 builder.Services.AddSingleton<Func<SerialPortConfig, ReconnectConfig?, SerialPortService>>(sp =>
 {
@@ -75,41 +77,15 @@ using (var scope = app.Services.CreateScope())
 }
 
 var postScanManager = app.Services.GetRequiredService<PostScanManager>();
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var groupConfigs = db.PostScanActionGroups
-        .OrderBy(g => g.SortOrder)
-        .Select(g => new PostScanActionGroupConfig
-        {
-            Id = g.Id,
-            Name = g.Name,
-            Enabled = g.Enabled,
-            ScannerNames = db.PostScanActionGroupScanners
-                .Where(s => s.GroupId == g.Id)
-                .Select(s => s.ScannerName)
-                .ToList(),
-            Actions = db.PostScanActions
-                .Where(a => a.GroupId == g.Id)
-                .OrderBy(a => a.SortOrder)
-                .Select(a => new PostScanActionConfig
-                {
-                    Type = a.Type,
-                    Enabled = a.Enabled,
-                    Settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(a.SettingsJson) ?? new()
-                })
-                .ToList()
-        })
-        .AsSplitQuery()
-        .ToList();
-    postScanManager.Configure(groupConfigs);
+var groupManager = app.Services.GetRequiredService<GroupManager>();
+var groupConfigs = groupManager.LoadGroups();
+postScanManager.Configure(groupConfigs);
 
-    // Загрузка визуальных сценариев
-    var scenarioService = app.Services.GetRequiredService<ScenarioService>();
-    var scenarioExecutor = app.Services.GetRequiredService<ScenarioExecutor>();
-    var scenarioConfigs = scenarioService.GetAllWithGraph();
-    postScanManager.ConfigureScenarios(scenarioConfigs, scenarioExecutor);
-}
+// Загрузка визуальных сценариев
+var scenarioService = app.Services.GetRequiredService<ScenarioService>();
+var scenarioExecutor = app.Services.GetRequiredService<ScenarioExecutor>();
+var scenarioConfigs = scenarioService.GetAllWithGraph();
+postScanManager.ConfigureScenarios(scenarioConfigs, scenarioExecutor);
 
 List<SerialPortConfig> ReadScanners()
 {
@@ -136,7 +112,7 @@ app.MapFallbackToFile("layout.html");
 app.MapScannerEndpoints(manager, ReadScanners);
 app.MapLogEndpoints();
 app.MapPortEndpoints();
-app.MapPostScanEndpoints(postScanManager);
+app.MapPostScanEndpoints(postScanManager, groupManager);
 app.MapSettingsEndpoints(manager, ReadScanners);
 app.MapDashboardEndpoints(manager);
 app.MapScenarioEndpoints();

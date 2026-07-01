@@ -23,15 +23,14 @@ async function loadDashboard() {
 
 async function loadDashStats() {
     try {
-        const r = await fetch('/api/dashboard/stats');
-        const d = await r.json();
+        const d = await Api.get('/api/dashboard/stats');
         document.getElementById('dashTotalScanners').textContent = d.totalScanners;
         document.getElementById('dashActiveScanners').textContent = d.activeScanners;
         document.getElementById('dashTotalScans').textContent = d.totalScans.toLocaleString('ru-RU');
         document.getElementById('dashScansToday').textContent = d.scansToday.toLocaleString('ru-RU');
         document.getElementById('dashSuccessRate').textContent = d.successRate.toFixed(1) + '%';
         document.getElementById('dashDbSize').textContent = d.dbSizeMb.toFixed(1) + ' МБ';
-    } catch (e) { console.error('dash stats', e); }
+    } catch (e) { handleApiError(e, 'Статистика дашборда'); }
 }
 
 async function loadDashActivity(period) {
@@ -41,8 +40,7 @@ async function loadDashActivity(period) {
     });
     if (!document.getElementById('activityChart')) return;
     try {
-        const r = await fetch('/api/dashboard/activity?period=' + period);
-        const d = await r.json();
+        const d = await Api.get('/api/dashboard/activity?period=' + period);
         renderActivityChart(d.labels, d.data, period);
     } catch (e) { console.error('dash activity', e); }
 }
@@ -89,10 +87,9 @@ function renderActivityChart(labels, data, period) {
 
 async function loadDashFormats() {
     try {
-        const r = await fetch('/api/dashboard/formats');
-        const d = await r.json();
+        const d = await Api.get('/api/dashboard/formats');
         renderFormatChart(d.labels, d.data, d.colors);
-    } catch (e) { console.error('dash formats', e); }
+    } catch (e) { handleApiError(e, 'Форматы дашборда'); }
 }
 
 function renderFormatChart(labels, data, colors) {
@@ -140,8 +137,7 @@ function renderFormatChart(labels, data, colors) {
 
 async function loadDashScans() {
     try {
-        const r = await fetch('/api/dashboard/scans?limit=20');
-        const scans = await r.json();
+        const scans = await Api.get('/api/dashboard/scans?limit=20');
         const tbody = document.getElementById('dashScansBody');
         const empty = document.getElementById('dashScansEmpty');
         if (!tbody || !empty) return;
@@ -161,8 +157,7 @@ async function loadDashScans() {
 
 async function loadDashPerScanner() {
     try {
-        const r = await fetch('/api/dashboard/per-scanner');
-        const scanners = await r.json();
+        const scanners = await Api.get('/api/dashboard/per-scanner');
         const container = document.getElementById('dashScannerCards');
         if (!container) return;
         if (!scanners.length) {
@@ -202,8 +197,7 @@ async function loadDashPerScanner() {
 
 async function loadDashReconnects() {
     try {
-        const r = await fetch('/api/dashboard/reconnects?hours=24');
-        const errors = await r.json();
+        const errors = await Api.get('/api/dashboard/reconnects?hours=24');
         const container = document.getElementById('dashReconnects');
         const empty = document.getElementById('dashReconnectsEmpty');
         if (!container || !empty) return;

@@ -8,12 +8,13 @@ namespace ScanBridge.Services.PostScanActions;
 /// Действие обогащения данных сканирования.
 /// Отправляет данные на внешний API и сохраняет результат в Metadata.
 /// </summary>
-public class DataEnrichmentAction : IPostScanAction, IDisposable
+public class DataEnrichmentAction : IPostScanAction
 {
     public string Type => "DataEnrichment";
 
+    private static readonly HttpClient SharedHttpClient = new();
+
     private readonly ILogger<DataEnrichmentAction> _logger;
-    private readonly HttpClient _httpClient;
     private readonly string _url;
     private readonly string _method;
     private readonly string _headers;
@@ -24,7 +25,6 @@ public class DataEnrichmentAction : IPostScanAction, IDisposable
     public DataEnrichmentAction(ILogger<DataEnrichmentAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
-        _httpClient = new HttpClient();
 
         _url = settings.TryGetValue("Url", out var url) ? url : "";
         _method = (settings.TryGetValue("Method", out var method) ? method : "GET").ToUpperInvariant();
@@ -35,7 +35,7 @@ public class DataEnrichmentAction : IPostScanAction, IDisposable
         _queryParam = settings.TryGetValue("QueryParam", out var qp) && !string.IsNullOrWhiteSpace(qp)
             ? qp : "data";
 
-        _httpClient.Timeout = TimeSpan.FromSeconds(_timeoutSeconds);
+        SharedHttpClient.Timeout = TimeSpan.FromSeconds(_timeoutSeconds);
 
         if (string.IsNullOrWhiteSpace(_url))
             _logger.LogWarning("DataEnrichment: URL не задан, обогащение не будет выполняться");
@@ -56,7 +56,7 @@ public class DataEnrichmentAction : IPostScanAction, IDisposable
                 using var request = new HttpRequestMessage(HttpMethod.Post, _url);
                 ApplyHeaders(request);
                 request.Content = JsonContent.Create(body);
-                using var response = await _httpClient.SendAsync(request, ct);
+                using var response = await SharedHttpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
                 responseText = await response.Content.ReadAsStringAsync(ct);
             }
@@ -67,7 +67,7 @@ public class DataEnrichmentAction : IPostScanAction, IDisposable
                 var fullUrl = $"{_url}{separator}{_queryParam}={escapedData}";
                 using var request = new HttpRequestMessage(HttpMethod.Get, fullUrl);
                 ApplyHeaders(request);
-                using var response = await _httpClient.SendAsync(request, ct);
+                using var response = await SharedHttpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
                 responseText = await response.Content.ReadAsStringAsync(ct);
             }
@@ -116,8 +116,4 @@ public class DataEnrichmentAction : IPostScanAction, IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _httpClient.Dispose();
-    }
 }

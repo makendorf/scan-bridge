@@ -226,12 +226,15 @@ public class ScenarioService
             return new ValidationResult(false, errors);
         }
 
-        // Проверить наличие Start и End
+        // Проверить наличие точки входа: Scanner или Start (legacy)
+        var hasScanner = config.Nodes.Any(n => n.Type == "Scanner");
         var hasStart = config.Nodes.Any(n => n.Type == "Start");
         var hasEnd = config.Nodes.Any(n => n.Type == "End");
 
-        if (!hasStart) errors.Add("Отсутствует узел Start");
-        if (!hasEnd) errors.Add("Отсутствует узел End");
+        if (!hasScanner && !hasStart)
+            errors.Add("Отсутствует узел Scanner (точка входа данных)");
+        if (!hasEnd)
+            errors.Add("Отсутствует узел End");
 
         // Проверить, что все узлы связаны
         var nodeIds = config.Nodes.Select(n => n.NodeId).ToHashSet();
@@ -247,7 +250,8 @@ public class ScenarioService
         foreach (var nodeId in disconnected)
         {
             var node = config.Nodes.First(n => n.NodeId == nodeId);
-            if (node.Type != "Start" && node.Type != "End")
+            // Entry/exit points (Start, Scanner, End) can be disconnected
+            if (node.Type != "Start" && node.Type != "Scanner" && node.Type != "End")
             {
                 errors.Add($"Узел «{nodeId}» не связан с другими узлами");
             }
@@ -270,14 +274,15 @@ public class ScenarioService
             Connections = new List<ScenarioConnectionConfig>()
         };
 
-        // Создать Start узел
+        // Создать Scanner узел (точка входа)
         var startNodeId = "1";
         scenario.Nodes.Add(new ScenarioNodeConfig
         {
             NodeId = startNodeId,
-            Type = "Start",
+            Type = "Scanner",
             PositionX = 50,
-            PositionY = 200
+            PositionY = 200,
+            Settings = new Dictionary<string, string> { ["scannerName"] = "" }
         });
 
         // Создать Action узлы

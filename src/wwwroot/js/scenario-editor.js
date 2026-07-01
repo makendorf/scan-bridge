@@ -35,6 +35,13 @@ function createActionTemplate(actionType) {
 }
 
 const VS_NODE_TEMPLATES = {
+    Scanner: () => `
+        <div class="vs-node vs-node-scanner">
+            <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="scan-barcode"></i></span> Сканер</div>
+            <div class="vs-node-body">
+                <div class="vs-scanner-display">все сканеры</div>
+            </div>
+        </div>`,
     Start: () => `
         <div class="vs-node vs-node-start">
             <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="play"></i></span> Старт</div>
@@ -70,7 +77,7 @@ Object.keys(ACTION_TYPES).forEach(key => {
 
 // All node types for the palette
 const PALETTE_NODE_TYPES = [
-    { type: 'Start', label: 'Старт', icon: 'play' },
+    { type: 'Scanner', label: 'Сканер', icon: 'scan-barcode' },
     ...Object.keys(ACTION_TYPES).map(key => ({
         type: key,
         label: ACTION_TYPES[key].name,
@@ -90,10 +97,9 @@ async function initScenarioEditor(scenario, scenarioId) {
     // If scenarioId provided, fetch from API
     if (!scenario && scenarioId) {
         try {
-            const res = await fetch(`/api/scenarios/${scenarioId}`);
-            if (res.ok) scenario = await res.json();
+            scenario = await Api.get(`/api/scenarios/${scenarioId}`);
         } catch (e) {
-            console.error('Failed to load scenario:', e);
+            handleApiError(e, 'Загрузка сценария');
         }
     }
 
@@ -149,7 +155,7 @@ function importScenarioToDrawflow(scenario) {
 
     // Add nodes
     scenario.nodes.forEach(node => {
-        const inputCount = node.type === 'Start' ? 0 : 1;
+        const inputCount = (node.type === 'Start' || node.type === 'Scanner') ? 0 : 1;
         const outputCount = node.type === 'Condition' || node.type === 'While' ? 2 : (node.type === 'Fork' ? 3 : (node.type === 'End' ? 0 : 1));
         const template = VS_NODE_TEMPLATES[node.type];
         if (!template) return;
@@ -166,6 +172,17 @@ function importScenarioToDrawflow(scenario) {
         );
         nodeMap[node.nodeId] = id.toString();
         NODE_COUNTER = Math.max(NODE_COUNTER, parseInt(id) + 1);
+
+        // Update node display from settings
+        if (node.type === 'Scanner' && nodeSettings.scannerName) {
+            updateScannerNodeDisplay(id, nodeSettings.scannerName);
+        }
+        if (node.type === 'Condition') {
+            updateConditionNodeDisplay(id, 'Condition', nodeSettings);
+        }
+        if (node.type === 'While') {
+            updateWhileNodeDisplay(id, nodeSettings);
+        }
     });
 
     // Add connections
@@ -197,7 +214,7 @@ function setupPaletteDragDrop() {
             const x = e.clientX - rect.left + drawflowContainer.parentElement.scrollLeft;
             const y = e.clientY - rect.top + drawflowContainer.parentElement.scrollTop;
 
-            const inputCount = type === 'Start' ? 0 : 1;
+            const inputCount = (type === 'Start' || type === 'Scanner') ? 0 : 1;
             const outputCount = type === 'Condition' || type === 'While' ? 2 : (type === 'Fork' ? 3 : (type === 'End' ? 0 : 1));
 
             drawflowEditor.addNode(
@@ -266,6 +283,37 @@ function openNodeSettingsModal(id) {
         content.innerHTML = `<div id="nodeActionDescription"></div><div class="form-grid" id="nodeActionSettings"></div>`;
         updateActionSettings(nodeClass, existing, 'nodeActionSettings');
 
+    } else if (nodeClass === 'Scanner') {
+        title.textContent = 'Настройки: Сканер';
+        const settings = getDrawflowNodeSettings(id);
+        const currentScanner = settings.scannerName || '';
+        content.innerHTML = `
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Сканер</label>
+                    <select class="vs-setting" data-key="scannerName" id="scannerNodeSelect" onchange="onScannerNodeSelectChange(${id}, this.value)">
+                        <option value="" ${!currentScanner ? 'selected' : ''}>Все сканеры</option>
+                    </select>
+                </div>
+                <p style="color:var(--color-text-muted);font-size:12px;margin-top:8px">
+                    Узел активируется при получении данных от выбранного сканера.
+                    «Все сканеры» — активируется всегда.
+                </p>
+            </div>
+        `;
+        // Load scanner list from API
+        Api.get('/api/scanners').then(scanners => {
+            const sel = document.getElementById('scannerNodeSelect');
+            if (!sel) return;
+            scanners.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name;
+                if (s.name === currentScanner) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }).catch(() => {});
+
     } else if (nodeClass === 'Condition') {
         title.textContent = 'Настройки: Условие';
         const settings = getDrawflowNodeSettings(id);
@@ -303,13 +351,21 @@ function openNodeSettingsModal(id) {
     } else if (nodeClass === 'While') {
         title.textContent = 'Настройки: Цикл';
         const settings = getDrawflowNodeSettings(id);
+        const logic = settings.logic || 'and';
         let conditions = [];
         try { conditions = JSON.parse(settings.conditions || '[]'); } catch(e) { conditions = []; }
         if (conditions.length === 0) {
             conditions = [{ field: 'data', operator: 'contains', value: '' }];
         }
         content.innerHTML = `
-            <div class="form-section-title">Условия цикла (все должны быть истинны)</div>
+            <div class="form-group" style="margin-bottom:12px">
+                <label>Логика</label>
+                <select class="vs-setting" data-key="logic" onchange="onWhileLogicChange()">
+                    <option value="and" ${logic === 'and' ? 'selected' : ''}>И (AND) — все условия</option>
+                    <option value="or" ${logic === 'or' ? 'selected' : ''}>Или (OR) — любое условие</option>
+                </select>
+            </div>
+            <div class="form-section-title">Условия</div>
             <div id="whileConditions"></div>
             <button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="addWhileCondition()">
                 <i data-lucide="plus" style="width:12px;height:12px"></i> Добавить условие
@@ -385,6 +441,63 @@ function saveNodeSettingsFromUI(id) {
     if (Object.keys(settings).length > 0) {
         drawflowEditor.updateNodeDataFromId(parseInt(id), { settings });
     }
+
+    // Update node display
+    updateScannerNodeDisplay(id, settings.scannerName);
+    updateConditionNodeDisplay(id, nodeClass, settings);
+    updateWhileNodeDisplay(id, settings);
+}
+
+function updateScannerNodeDisplay(nodeId, scannerName) {
+    const name = scannerName || '';
+    const nodeEl = document.querySelector(`#node-${nodeId} .vs-scanner-display`);
+    if (nodeEl) {
+        nodeEl.textContent = name || 'все сканеры';
+    }
+}
+
+function onScannerNodeSelectChange(nodeId, value) {
+    updateScannerNodeDisplay(nodeId, value);
+}
+
+function onWhileLogicChange() {
+    // Logic selector doesn't need live update — it's saved when modal closes
+}
+
+/* ── Condition / While display helpers ── */
+const FIELD_LABELS = { data: 'Данные', raw: 'Raw', format: 'Формат', scanner: 'Сканер', isValid: 'Валиден' };
+const OP_LABELS = { equals: '=', notEquals: '≠', contains: '∈', notContains: '∉', regex: '~', greaterThan: '>', lessThan: '<', isValid: ' Valid?' };
+
+function formatConditionText(settings) {
+    if (!settings || !settings.field) return '';
+    const field = FIELD_LABELS[settings.field] || settings.field;
+    const op = OP_LABELS[settings.operator] || settings.operator || '=';
+    const val = settings.value || '';
+    if (settings.operator === 'isValid') return `${field} ✓`;
+    return `${field} ${op} ${val}`;
+}
+
+function updateConditionNodeDisplay(nodeId, nodeClass, settings) {
+    if (nodeClass !== 'Condition') return;
+    const nodeEl = document.querySelector(`#node-${nodeId} .vs-condition-display`);
+    if (!nodeEl) return;
+    const text = formatConditionText(settings);
+    nodeEl.textContent = text || 'настройте условие';
+}
+
+function updateWhileNodeDisplay(nodeId, settings) {
+    const nodeEl = document.querySelector(`#node-${nodeId} .vs-condition-display`);
+    if (!nodeEl) return;
+    let conditions = [];
+    try { conditions = JSON.parse(settings.conditions || '[]'); } catch(e) { conditions = []; }
+    if (conditions.length === 0) {
+        nodeEl.textContent = 'настройте условие';
+        return;
+    }
+    const logic = settings.logic || 'and';
+    const logicLabel = logic === 'or' ? ' OR ' : ' AND ';
+    const texts = conditions.map(c => formatConditionText(c)).filter(Boolean);
+    nodeEl.textContent = texts.join(logicLabel) || 'настройте условие';
 }
 
 /* ── While Conditions Management ── */
@@ -495,24 +608,10 @@ function cancelScenarioSave() {
 
 async function doSaveScenario(scenario) {
     try {
-        let res;
         if (scenario.id) {
-            res = await fetch(`/api/scenarios/${scenario.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(scenario)
-            });
+            await Api.put(`/api/scenarios/${scenario.id}`, scenario);
         } else {
-            res = await fetch('/api/scenarios', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(scenario)
-            });
-        }
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.errors ? err.errors.join('; ') : 'Save failed');
+            await Api.post('/api/scenarios', scenario);
         }
 
         showToast('Сценарий сохранён', 'success');
@@ -520,8 +619,7 @@ async function doSaveScenario(scenario) {
         navigateTo('scenarios');
         loadScenarios();
     } catch (e) {
-        console.error('Failed to save scenario:', e);
-        showToast(`Ошибка сохранения: ${e.message}`, 'error');
+        handleApiError(e, 'Сохранение сценария');
     }
 }
 

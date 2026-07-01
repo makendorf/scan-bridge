@@ -29,8 +29,9 @@ public class ScannerManagerTests : IDisposable
                 new Mock<IBarcodeParser>().Object,
                 new Mock<ScanProcessorService>(
                     new Mock<PostScanManager>(
-                        new Mock<IPostScanActionFactory>().Object,
-                        new Mock<ILogger<PostScanManager>>().Object).Object,
+                        new Mock<ScanDispatcher>(
+                            Mock.Of<IPostScanActionFactory>(),
+                            Mock.Of<ILogger<ScanDispatcher>>()).Object).Object,
                     new ScanTracker(),
                     new ScanHistoryService(
                         new Mock<IServiceScopeFactory>().Object,

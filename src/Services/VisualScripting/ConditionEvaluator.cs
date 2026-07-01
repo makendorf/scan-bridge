@@ -24,9 +24,12 @@ public static class ConditionEvaluator
     }
 
     /// <summary>
-    /// Оценивает несколько условий для While (все должны быть истинны — AND-логика).
+    /// Оценивает несколько условий для While с указанным логическим оператором.
     /// </summary>
-    public static bool EvaluateMultiple(string conditionsJson, ScanResult scan)
+    /// <param name="conditionsJson">JSON-массив условий.</param>
+    /// <param name="scan">Результат сканирования.</param>
+    /// <param name="logic">Логический оператор: "and" (по умолчанию) или "or".</param>
+    public static bool EvaluateMultiple(string conditionsJson, ScanResult scan, string logic = "and")
     {
         if (string.IsNullOrEmpty(conditionsJson)) return false;
 
@@ -35,12 +38,26 @@ public static class ConditionEvaluator
             var conditions = JsonSerializer.Deserialize<List<Dictionary<string, string>>>(conditionsJson);
             if (conditions == null || conditions.Count == 0) return false;
 
-            foreach (var condition in conditions)
+            if (string.Equals(logic, "or", StringComparison.OrdinalIgnoreCase))
             {
-                if (!Evaluate(condition, scan))
-                    return false;
+                // OR: хотя бы одно условие истинно
+                foreach (var condition in conditions)
+                {
+                    if (Evaluate(condition, scan))
+                        return true;
+                }
+                return false;
             }
-            return true;
+            else
+            {
+                // AND: все условия должны быть истинны
+                foreach (var condition in conditions)
+                {
+                    if (!Evaluate(condition, scan))
+                        return false;
+                }
+                return true;
+            }
         }
         catch
         {

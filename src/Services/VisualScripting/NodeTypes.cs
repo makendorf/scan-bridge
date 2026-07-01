@@ -7,7 +7,8 @@ public static class NodeTypes
 {
     public static readonly Dictionary<string, NodeTypeDefinition> Definitions = new()
     {
-        ["Start"] = new("Старт", "Точка входа", [], ["output_1"]),
+        ["Start"] = new("Старт", "Точка входа (legacy)", [], ["output_1"]),
+        ["Scanner"] = new("Сканер", "Точка входа данных от сканера", [], ["output_1"]),
         ["Fork"] = new("Ветвление", "Разделение потока на несколько веток", ["input_1"], ["output_1", "output_2", "output_3"]),
         ["Condition"] = new("Условие", "Ветвление по условию", ["input_1"], ["output_1", "output_2"]),
         ["While"] = new("Цикл", "Повторение тела цикла пока условие истинно", ["input_1"], ["output_1", "output_2"]),

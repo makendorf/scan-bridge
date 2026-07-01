@@ -9,9 +9,10 @@ function startLogPolling() { stopLogPolling(); logTimer = setInterval(loadLogs, 
 function stopLogPolling() { if (logTimer) { clearInterval(logTimer); logTimer = null; } }
 
 async function loadLogs() {
-    const res = await fetch('/api/logs');
-    logEntries = await res.json();
-    renderLogs();
+    try {
+        logEntries = await Api.get('/api/logs');
+        renderLogs();
+    } catch (e) { handleApiError(e, 'Загрузка логов'); }
 }
 
 function renderLogLine(e) {
@@ -77,8 +78,10 @@ function initLogsPage() {
 }
 
 async function clearLogs() {
-    await fetch('/api/logs', { method: 'DELETE' });
-    logEntries = [];
-    lastRenderedLogCount = 0;
-    document.getElementById('logPanel').innerHTML = '';
+    try {
+        await Api.delete('/api/logs');
+        logEntries = [];
+        lastRenderedLogCount = 0;
+        document.getElementById('logPanel').innerHTML = '';
+    } catch (e) { handleApiError(e, 'Очистка логов'); }
 }

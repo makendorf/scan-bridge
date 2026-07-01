@@ -5,7 +5,7 @@ using ScanBridge.Models;
 using ScanBridge.Services;
 using ScanBridge.Services.VisualScripting;
 
-namespace Tests.Services;
+namespace ScanBridge.Tests.Services;
 
 public class ScenarioServiceTests
 {
@@ -52,7 +52,7 @@ public class ScenarioServiceTests
         var result = service.Validate(config);
 
         Assert.False(result.IsValid);
-        Assert.Contains("Отсутствует узел Start", result.Errors);
+        Assert.Contains(result.Errors, e => e.Contains("Scanner"));
     }
 
     [Fact]
@@ -119,10 +119,110 @@ public class ScenarioServiceTests
         var scenario = service.MigrateGroup(group);
 
         Assert.Equal("TestGroup", scenario.Name);
-        Assert.Equal(4, scenario.Nodes.Count); // Start + 2 Actions + End
+        Assert.Equal(4, scenario.Nodes.Count); // Scanner + 2 Actions + End
         Assert.Equal(3, scenario.Connections.Count);
-        Assert.Equal("Start", scenario.Nodes[0].Type);
+        Assert.Equal("Scanner", scenario.Nodes[0].Type);
         Assert.Equal("End", scenario.Nodes[^1].Type);
+    }
+
+    [Fact]
+    public void Validate_WithScannerNode_ReturnsSuccess()
+    {
+        var service = CreateService();
+        var config = new ScenarioConfig
+        {
+            Name = "ScannerScenario",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "Scanner1" } },
+                new() { NodeId = "2", Type = "End", PositionX = 200, PositionY = 0 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "2" },
+            }
+        };
+
+        var result = service.Validate(config);
+
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void Validate_MultipleScannerNodes_ReturnsSuccess()
+    {
+        var service = CreateService();
+        var config = new ScenarioConfig
+        {
+            Name = "MultiScanner",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "Scanner1" } },
+                new() { NodeId = "2", Type = "Scanner", PositionX = 0, PositionY = 100,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "Scanner2" } },
+                new() { NodeId = "3", Type = "Log", PositionX = 200, PositionY = 50 },
+                new() { NodeId = "4", Type = "End", PositionX = 400, PositionY = 50 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "3" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+                new() { SourceNodeId = "3", TargetNodeId = "4" },
+            }
+        };
+
+        var result = service.Validate(config);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_ScannerAndStartBothPresent_ReturnsSuccess()
+    {
+        var service = CreateService();
+        var config = new ScenarioConfig
+        {
+            Name = "Mixed",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "Scanner1" } },
+                new() { NodeId = "2", Type = "Start", PositionX = 0, PositionY = 100 },
+                new() { NodeId = "3", Type = "End", PositionX = 200, PositionY = 50 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "3" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+            }
+        };
+
+        var result = service.Validate(config);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_NoEntryNode_ReturnsError()
+    {
+        var service = CreateService();
+        var config = new ScenarioConfig
+        {
+            Name = "NoEntry",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "End", PositionX = 0, PositionY = 0 }
+            },
+            Connections = new()
+        };
+
+        var result = service.Validate(config);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Scanner"));
     }
 
     private ScenarioService CreateService()

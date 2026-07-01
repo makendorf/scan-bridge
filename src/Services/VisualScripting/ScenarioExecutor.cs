@@ -11,6 +11,8 @@ public class ScenarioExecutor
     private readonly IPostScanActionFactory _factory;
     private readonly ILogger<ScenarioExecutor> _logger;
 
+    private static readonly HashSet<string> StructuralTypes = new() { "Start", "Scanner", "Condition", "End", "Fork", "While" };
+
     public ScenarioExecutor(IPostScanActionFactory factory, ILogger<ScenarioExecutor> logger)
     {
         _factory = factory;
@@ -20,8 +22,6 @@ public class ScenarioExecutor
     /// <summary>
     /// Компилирует сценарий: проверяет граф, строит adjacency, проверяет на циклы.
     /// </summary>
-    /// <param name="scenario">Конфигурация сценария.</param>
-    /// <returns>Скомпилированный сценарий или null при ошибке.</returns>
     public CompiledScenario? Compile(ScenarioConfig scenario)
     {
         if (scenario.Nodes.Count == 0)
@@ -30,12 +30,29 @@ public class ScenarioExecutor
             return null;
         }
 
-        // Найти Start узел
-        var startNodeConfig = scenario.Nodes.FirstOrDefault(n => n.Type == "Start");
-        if (startNodeConfig == null)
+        // Найти Scanner узлы (новый стиль) или Start узлы (legacy)
+        var scannerNodeConfigs = scenario.Nodes.Where(n => n.Type == "Scanner").ToList();
+        var startNodeConfigs = scenario.Nodes.Where(n => n.Type == "Start").ToList();
+
+        // Если есть Scanner узлы — используем их
+        // Если только Start — мигрируем в Scanner с пустым именем (все сканеры)
+        if (scannerNodeConfigs.Count == 0 && startNodeConfigs.Count == 0)
         {
-            _logger.LogWarning("Сценарий «{Name}» не содержит Start узел", scenario.Name);
+            _logger.LogWarning("Сценарий «{Name}» не содержит Start/Scanner узел", scenario.Name);
             return null;
+        }
+
+        // Если только Start (legacy) — создаём виртуальные Scanner узлы
+        if (scannerNodeConfigs.Count == 0)
+        {
+            scannerNodeConfigs = startNodeConfigs.Select(s => new ScenarioNodeConfig
+            {
+                NodeId = s.NodeId,
+                Type = "Scanner",
+                PositionX = s.PositionX,
+                PositionY = s.PositionY,
+                Settings = new Dictionary<string, string> { ["scannerName"] = "" }
+            }).ToList();
         }
 
         // Создать скомпилированные узлы
@@ -45,8 +62,9 @@ public class ScenarioExecutor
             IPostScanAction? action = null;
             var nodeType = nodeConfig.Type;
 
-            // Action nodes: type is either "Action" with ActionType, or the action type directly (e.g. "Log")
-            var actionType = nodeConfig.ActionType ?? (nodeType != "Start" && nodeType != "Condition" && nodeType != "End" && nodeType != "Fork" && nodeType != "While" ? nodeType : null);
+            // Определить ActionType для action-узлов
+            var actionType = nodeConfig.ActionType
+                ?? (nodeType != "Start" && !StructuralTypes.Contains(nodeType) ? nodeType : null);
 
             if (actionType != null)
             {
@@ -83,16 +101,25 @@ public class ScenarioExecutor
             return null;
         }
 
-        var startNode = compiledNodes[startNodeConfig.NodeId];
-        return new CompiledScenario(scenario, startNode, compiledNodes);
+        // Собрать Scanner узлы с именами сканеров
+        var scannerNodes = new List<(string ScannerName, CompiledNode Node)>();
+        foreach (var scannerConfig in scannerNodeConfigs)
+        {
+            if (compiledNodes.TryGetValue(scannerConfig.NodeId, out var compiledScannerNode))
+            {
+                var scannerName = scannerConfig.Settings?.GetValueOrDefault("scannerName") ?? "";
+                scannerNodes.Add((scannerName, compiledScannerNode));
+            }
+        }
+
+        var startNode = scannerNodes.Count > 0 ? scannerNodes[0].Node : compiledNodes.Values.First();
+        return new CompiledScenario(scenario, startNode, scannerNodes, compiledNodes);
     }
 
     /// <summary>
-    /// Выполняет скомпилированный сценарий.
+    /// Выполняет скомпилированный сценарий для результата сканирования.
+    /// Находит Scanner узлы, совпадающие с именем сканера, и выполняет их.
     /// </summary>
-    /// <param name="compiled">Скомпилированный сценарий.</param>
-    /// <param name="scan">Результат сканирования.</param>
-    /// <param name="ct">Токен отмены.</param>
     public async Task ExecuteAsync(CompiledScenario compiled, ScanResult scan, CancellationToken ct)
     {
         var context = new ScenarioContext
@@ -101,7 +128,22 @@ public class ScenarioExecutor
             CancellationToken = ct
         };
 
-        await ExecuteNodeAsync(compiled.StartNode, context);
+        // Найти Scanner узлы, совпадающие с именем сканера
+        var matchingEntries = compiled.ScannerNodes
+            .Where(s => string.IsNullOrEmpty(s.ScannerName) ||
+                        string.Equals(s.ScannerName, scan.ScannerName, StringComparison.Ordinal))
+            .ToList();
+
+        // Fallback: если есть только legacy Start узлы (все с пустым именем) — выполняем все
+        if (matchingEntries.Count == 0 && compiled.ScannerNodes.All(s => string.IsNullOrEmpty(s.ScannerName)))
+        {
+            matchingEntries = compiled.ScannerNodes;
+        }
+
+        foreach (var (_, node) in matchingEntries)
+        {
+            await ExecuteNodeAsync(node, context);
+        }
     }
 
     private async Task ExecuteNodeAsync(CompiledNode node, ScenarioContext context)
@@ -113,6 +155,8 @@ public class ScenarioExecutor
             switch (node.Config.Type)
             {
                 case "Start":
+                case "Scanner":
+                    // Pass-through: Scanner — точка входа, ничего не делаем
                     break;
 
                 case "Condition":
@@ -124,7 +168,8 @@ public class ScenarioExecutor
                 case "While":
                     var whileSettings = node.Config.Settings ?? new Dictionary<string, string>();
                     var conditionsJson = whileSettings.GetValueOrDefault("conditions", "[]");
-                    var whileResult = ConditionEvaluator.EvaluateMultiple(conditionsJson, context.Scan);
+                    var logic = whileSettings.GetValueOrDefault("logic", "and");
+                    var whileResult = ConditionEvaluator.EvaluateMultiple(conditionsJson, context.Scan, logic);
                     context.Variables["lastCondition"] = whileResult;
                     break;
 
@@ -132,7 +177,7 @@ public class ScenarioExecutor
                     return;
 
                 default:
-                    // All action types: Log, Replacement, ClipboardPaste, etc.
+                    // Все action типы: Log, Replacement, ClipboardPaste и т.д.
                     if (node.Action != null)
                     {
                         await node.Action.ExecuteAsync(context.Scan, context.CancellationToken);
@@ -175,10 +220,8 @@ public class ScenarioExecutor
                 var whileCondition = context.Variables.TryGetValue("lastCondition", out var wv) && wv is bool wb && wb;
                 if (whileCondition)
                 {
-                    // Найти выход output_1 (тело цикла) и выполнить его снова
                     if (node.PortConnections.TryGetValue("output_1", out var loopNodes) && loopNodes.Count > 0)
                     {
-                        // Защита от бесконечного цикла — максимум 100 итераций
                         var whileKey = $"while_{node.Config.NodeId}";
                         var iterations = context.Variables.TryGetValue(whileKey, out var iv) && iv is int intVal ? intVal : 0;
                         if (iterations < 100)
@@ -200,7 +243,6 @@ public class ScenarioExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка в узле {NodeId} ({Type})", node.Config.NodeId, node.Config.Type);
-            // Продолжаем выполнение с другими узлами
             foreach (var next in node.NextNodes)
             {
                 await ExecuteNodeAsync(next, context);

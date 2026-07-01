@@ -1,7 +1,7 @@
 using ScanBridge.Models;
 using ScanBridge.Services.VisualScripting;
 
-namespace Tests.Services;
+namespace ScanBridge.Tests.Services;
 
 public class ConditionEvaluatorTests
 {

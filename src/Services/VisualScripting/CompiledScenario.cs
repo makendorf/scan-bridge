@@ -9,12 +9,16 @@ public class CompiledScenario
 {
     public ScenarioConfig Config { get; }
     public CompiledNode StartNode { get; }
+    public List<(string ScannerName, CompiledNode Node)> ScannerNodes { get; }
     public Dictionary<string, CompiledNode> Nodes { get; }
 
-    public CompiledScenario(ScenarioConfig config, CompiledNode startNode, Dictionary<string, CompiledNode> nodes)
+    public CompiledScenario(ScenarioConfig config, CompiledNode startNode,
+        List<(string ScannerName, CompiledNode Node)> scannerNodes,
+        Dictionary<string, CompiledNode> nodes)
     {
         Config = config;
         StartNode = startNode;
+        ScannerNodes = scannerNodes;
         Nodes = nodes;
     }
 }

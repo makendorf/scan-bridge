@@ -4,7 +4,7 @@ using ScanBridge.Models;
 using ScanBridge.Services;
 using ScanBridge.Services.VisualScripting;
 
-namespace Tests.Services;
+namespace ScanBridge.Tests.Services;
 
 public class ScenarioExecutorTests
 {
@@ -150,6 +150,141 @@ public class ScenarioExecutorTests
         };
         var result = _executor.Compile(scenario);
         Assert.Null(result);
+    }
+
+    [Fact]
+    public void Compile_WithScannerNode_ReturnsSuccess()
+    {
+        var scenario = CreateScannerScenario();
+        var result = _executor.Compile(scenario);
+        Assert.NotNull(result);
+        Assert.Single(result.ScannerNodes);
+        Assert.Equal("Scanner1", result.ScannerNodes[0].ScannerName);
+    }
+
+    [Fact]
+    public void Compile_WithMultipleScannerNodes_ReturnsAll()
+    {
+        var scenario = new ScenarioConfig
+        {
+            Name = "MultiScanner",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "Scanner1" } },
+                new() { NodeId = "2", Type = "Scanner", PositionX = 0, PositionY = 100,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "Scanner2" } },
+                new() { NodeId = "3", Type = "Log", PositionX = 200, PositionY = 50 },
+                new() { NodeId = "4", Type = "End", PositionX = 400, PositionY = 50 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "3" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+                new() { SourceNodeId = "3", TargetNodeId = "4" },
+            }
+        };
+        var result = _executor.Compile(scenario);
+        Assert.NotNull(result);
+        Assert.Equal(2, result.ScannerNodes.Count);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ScannerNodeMatchesScannerName_CallsAction()
+    {
+        var actionMock = new Mock<IPostScanAction>();
+        actionMock.Setup(a => a.ExecuteAsync(It.IsAny<ScanResult>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _factoryMock.Setup(f => f.Create("Log", It.IsAny<Dictionary<string, string>>()))
+            .Returns(actionMock.Object);
+
+        var scenario = CreateScannerScenario();
+        var compiled = _executor.Compile(scenario);
+        Assert.NotNull(compiled);
+
+        var scan = new ScanResult { ScannerName = "Scanner1", ParsedData = "test" };
+        await _executor.ExecuteAsync(compiled, scan, CancellationToken.None);
+
+        actionMock.Verify(a => a.ExecuteAsync(It.IsAny<ScanResult>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ScannerNodeDoesNotMatch_SkipsAction()
+    {
+        var actionMock = new Mock<IPostScanAction>();
+        _factoryMock.Setup(f => f.Create("Log", It.IsAny<Dictionary<string, string>>()))
+            .Returns(actionMock.Object);
+
+        var scenario = CreateScannerScenario();
+        var compiled = _executor.Compile(scenario);
+
+        var scan = new ScanResult { ScannerName = "OtherScanner", ParsedData = "test" };
+        await _executor.ExecuteAsync(compiled, scan, CancellationToken.None);
+
+        actionMock.Verify(a => a.ExecuteAsync(It.IsAny<ScanResult>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EmptyScannerName_MatchesAll()
+    {
+        var actionMock = new Mock<IPostScanAction>();
+        actionMock.Setup(a => a.ExecuteAsync(It.IsAny<ScanResult>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _factoryMock.Setup(f => f.Create("Log", It.IsAny<Dictionary<string, string>>()))
+            .Returns(actionMock.Object);
+
+        var scenario = new ScenarioConfig
+        {
+            Name = "AllScanners",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "" } },
+                new() { NodeId = "2", Type = "Log", PositionX = 200, PositionY = 0 },
+                new() { NodeId = "3", Type = "End", PositionX = 400, PositionY = 0 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "2" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+            }
+        };
+        var compiled = _executor.Compile(scenario);
+
+        var scan = new ScanResult { ScannerName = "AnyScanner", ParsedData = "test" };
+        await _executor.ExecuteAsync(compiled, scan, CancellationToken.None);
+
+        actionMock.Verify(a => a.ExecuteAsync(It.IsAny<ScanResult>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void Compile_StartNodeLegacy_MigratesToScanner()
+    {
+        var scenario = CreateLinearScenario();
+        var result = _executor.Compile(scenario);
+        Assert.NotNull(result);
+        Assert.Single(result.ScannerNodes);
+        Assert.Equal("", result.ScannerNodes[0].ScannerName); // Start -> Scanner("")
+    }
+
+    private static ScenarioConfig CreateScannerScenario()
+    {
+        return new ScenarioConfig
+        {
+            Name = "ScannerScenario",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "Scanner1" } },
+                new() { NodeId = "2", Type = "Log", PositionX = 200, PositionY = 0 },
+                new() { NodeId = "3", Type = "End", PositionX = 400, PositionY = 0 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "2" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+            }
+        };
     }
 
     private static ScenarioConfig CreateLinearScenario()

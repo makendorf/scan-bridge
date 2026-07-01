@@ -6,14 +6,9 @@ let editingScenarioId = null;
 /* ── Load Scenarios ── */
 async function loadScenarios() {
     try {
-        const res = await fetch('/api/scenarios');
-        if (!res.ok) throw new Error('Failed to load scenarios');
-        scenarios = await res.json();
+        scenarios = await Api.get('/api/scenarios');
         renderScenarios();
-    } catch (e) {
-        console.error('Failed to load scenarios:', e);
-        showToast('Ошибка загрузки сценариев', 'error');
-    }
+    } catch (e) { handleApiError(e, 'Загрузка сценариев'); }
 }
 
 /* ── Render Scenario Cards ── */
@@ -83,30 +78,21 @@ async function editScenario(id) {
 /* ── Delete Scenario ── */
 async function deleteScenario(id, name) {
     if (!confirm(`Удалить сценарий «${name}»?`)) return;
-
     try {
-        const res = await fetch(`/api/scenarios/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to delete');
+        await Api.delete(`/api/scenarios/${id}`);
         showToast(`Сценарий «${name}» удалён`, 'success');
         loadScenarios();
-    } catch (e) {
-        console.error('Failed to delete scenario:', e);
-        showToast('Ошибка удаления сценария', 'error');
-    }
+    } catch (e) { handleApiError(e, 'Удаление сценария'); }
 }
 
 /* ── Validate Scenario from list ── */
 async function validateScenarioFromList(id) {
     try {
-        const res = await fetch(`/api/scenarios/${id}/validate`, { method: 'POST' });
-        if (!res.ok) throw new Error('Failed to validate');
-        const result = await res.json();
+        const result = await Api.post(`/api/scenarios/${id}/validate`, {});
         if (result.isValid) {
             showToast('Сценарий валиден', 'success');
         } else {
             showToast(`Ошибки: ${result.errors.join('; ')}`, 'error');
         }
-    } catch (e) {
-        showToast('Ошибка валидации', 'error');
-    }
+    } catch (e) { handleApiError(e, 'Валидация сценария'); }
 }

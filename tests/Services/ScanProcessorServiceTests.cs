@@ -16,8 +16,9 @@ public class ScanProcessorServiceTests
     public ScanProcessorServiceTests()
     {
         _postScanMock = new Mock<PostScanManager>(
-            new Mock<IPostScanActionFactory>().Object,
-            new Mock<ILogger<PostScanManager>>().Object);
+            new Mock<ScanDispatcher>(
+                Mock.Of<IPostScanActionFactory>(),
+                Mock.Of<ILogger<ScanDispatcher>>()).Object);
         _scanTracker = new ScanTracker();
         var historyService = new ScanHistoryService(
             new Mock<IServiceScopeFactory>().Object,
