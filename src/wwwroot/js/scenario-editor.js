@@ -72,9 +72,21 @@ const PALETTE_NODE_TYPES = [
 let NODE_COUNTER = 0;
 
 /* ── Initialize Editor ── */
-function initScenarioEditor(scenario) {
+async function initScenarioEditor(scenario, scenarioId) {
     editingScenarioConfig = scenario;
     NODE_COUNTER = 0;
+
+    // If scenarioId provided, fetch from API
+    if (!scenario && scenarioId) {
+        try {
+            const res = await fetch(`/api/scenarios/${scenarioId}`);
+            if (res.ok) scenario = await res.json();
+        } catch (e) {
+            console.error('Failed to load scenario:', e);
+        }
+    }
+
+    editingScenarioConfig = scenario;
 
     const titleEl = document.getElementById('scenarioEditorTitle');
     titleEl.textContent = scenario ? `Редактирование: ${scenario.name}` : 'Новый сценарий';
@@ -83,7 +95,7 @@ function initScenarioEditor(scenario) {
     container.innerHTML = '';
 
     if (drawflowEditor) {
-        drawflowEditor.destroy();
+        try { drawflowEditor.clear(); } catch(e) {}
     }
 
     drawflowEditor = new Drawflow(container);

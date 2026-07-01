@@ -20,6 +20,7 @@ async function loadScenarios() {
 function renderScenarios() {
     const container = document.getElementById('scenarioCards');
     const emptyState = document.getElementById('scenariosEmpty');
+    if (!container || !emptyState) return;
 
     if (scenarios.length === 0) {
         container.innerHTML = '';
@@ -75,15 +76,8 @@ let editingScenarioData = null;
 
 async function editScenario(id) {
     editingScenarioId = id;
-    try {
-        const res = await fetch(`/api/scenarios/${id}`);
-        if (!res.ok) throw new Error('Failed to load scenario');
-        editingScenarioData = await res.json();
-        navigateTo('scenario-editor');
-    } catch (e) {
-        console.error('Failed to load scenario:', e);
-        showToast('Ошибка загрузки сценария', 'error');
-    }
+    location.hash = 'scenario-editor?id=' + id;
+    Router.navigate('scenario-editor');
 }
 
 /* ── Delete Scenario ── */
