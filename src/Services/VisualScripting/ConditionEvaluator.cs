@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.ServiceProcess;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -119,6 +120,9 @@ public class ConditionEvaluator
                 break;
             case "processRunning":
                 data = Process.GetProcessesByName(value).Length > 0 ? "true" : "false";
+                break;
+            case "serviceRunning":
+                data = IsServiceRunning(value) ? "true" : "false";
                 break;
             case "hostAvailable":
                 data = CheckHost(value) ? "true" : "false";
@@ -376,6 +380,19 @@ public class ConditionEvaluator
             };
         }
         catch { return ""; }
+    }
+
+    private static bool IsServiceRunning(string serviceName)
+    {
+        try
+        {
+            var service = System.ServiceProcess.ServiceController.GetServices()
+                .FirstOrDefault(s => s.ServiceName.Equals(serviceName, StringComparison.OrdinalIgnoreCase));
+            if (service == null) return false;
+            service.Refresh();
+            return service.Status == System.ServiceProcess.ServiceControllerStatus.Running;
+        }
+        catch { return false; }
     }
 
     private static bool CompareValue(string data, string op, string value)

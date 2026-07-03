@@ -135,6 +135,7 @@ function getFieldSelectOptions(selectedField) {
         <optgroup label="Система">
             <option value="envVar" ${selectedField === 'envVar' ? 'selected' : ''}>Переменная окружения</option>
             <option value="processRunning" ${selectedField === 'processRunning' ? 'selected' : ''}>Процесс запущен</option>
+            <option value="serviceRunning" ${selectedField === 'serviceRunning' ? 'selected' : ''}>Служба запущена</option>
             <option value="hostAvailable" ${selectedField === 'hostAvailable' ? 'selected' : ''}>Хост доступен</option>
             <option value="diskFreeMB" ${selectedField === 'diskFreeMB' ? 'selected' : ''}>Свободно МБ</option>
         </optgroup>
