@@ -32,15 +32,19 @@ public class ScenarioExecutor
             return null;
         }
 
-        // Найти Scanner узлы (новый стиль) или Start узлы (legacy)
+        // Найти триггерные узлы (новый стиль) или Start узлы (legacy)
         var scannerNodeConfigs = scenario.Nodes.Where(n => n.Type == "Scanner").ToList();
+        var httpTriggerConfigs = scenario.Nodes.Where(n => n.Type == "HttpTrigger").ToList();
+        var scheduleTriggerConfigs = scenario.Nodes.Where(n => n.Type == "ScheduleTrigger").ToList();
+        var fileTriggerConfigs = scenario.Nodes.Where(n => n.Type == "FileTrigger").ToList();
         var startNodeConfigs = scenario.Nodes.Where(n => n.Type == "Start").ToList();
 
-        // Если есть Scanner узлы — используем их
+        // Если есть триггерные узлы — используем их
         // Если только Start — мигрируем в Scanner с пустым именем (все сканеры)
-        if (scannerNodeConfigs.Count == 0 && startNodeConfigs.Count == 0)
+        var allTriggers = scannerNodeConfigs.Concat(httpTriggerConfigs).Concat(scheduleTriggerConfigs).Concat(fileTriggerConfigs).ToList();
+        if (allTriggers.Count == 0 && startNodeConfigs.Count == 0)
         {
-            _logger.LogWarning("Сценарий «{Name}» не содержит Start/Scanner узел", scenario.Name);
+            _logger.LogWarning("Сценарий «{Name}» не содержит узлов-триггеров", scenario.Name);
             return null;
         }
 
