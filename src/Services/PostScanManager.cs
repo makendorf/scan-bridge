@@ -5,7 +5,7 @@ namespace ScanBridge.Services;
 
 /// <summary>
 /// Менеджер пост-скан действий.
-/// Thin facade над ScanDispatcher — сохраняет совместимость DI и API.
+/// Thin facade над ScanDispatcher.
 /// </summary>
 public class PostScanManager
 {
@@ -16,9 +16,6 @@ public class PostScanManager
         _dispatcher = dispatcher;
     }
 
-    public virtual void Configure(List<PostScanActionGroupConfig> groupConfigs)
-        => _dispatcher.ConfigureGroups(groupConfigs);
-
     public virtual void ConfigureScenarios(List<ScenarioConfig> scenarioConfigs, ScenarioExecutor executor)
         => _dispatcher.ConfigureScenarios(scenarioConfigs, executor);
 
@@ -27,9 +24,6 @@ public class PostScanManager
 
     public virtual Task ExecuteAllAsync(ScanResult scan, CancellationToken ct)
         => _dispatcher.ExecuteAllAsync(scan, ct);
-
-    public virtual IReadOnlyList<string> GetEnabledActions()
-        => _dispatcher.GetEnabledActions();
 
     public int GetScenarioCount() => _dispatcher.GetScenarioCount();
 }

@@ -10,13 +10,15 @@ public class ScenarioExecutor
 {
     private readonly IPostScanActionFactory _factory;
     private readonly ILogger<ScenarioExecutor> _logger;
+    private readonly ConditionEvaluator _conditionEvaluator;
 
     private static readonly HashSet<string> StructuralTypes = new() { "Start", "Scanner", "Condition", "End", "Fork", "While" };
 
-    public ScenarioExecutor(IPostScanActionFactory factory, ILogger<ScenarioExecutor> logger)
+    public ScenarioExecutor(IPostScanActionFactory factory, ILogger<ScenarioExecutor> logger, ConditionEvaluator conditionEvaluator)
     {
         _factory = factory;
         _logger = logger;
+        _conditionEvaluator = conditionEvaluator;
     }
 
     /// <summary>
@@ -161,7 +163,7 @@ public class ScenarioExecutor
 
                 case "Condition":
                     var settings = node.Config.Settings ?? new Dictionary<string, string>();
-                    var result = ConditionEvaluator.Evaluate(settings, context.Scan);
+                    var result = _conditionEvaluator.Evaluate(settings, context.Scan);
                     context.Variables["lastCondition"] = result;
                     break;
 
@@ -169,7 +171,7 @@ public class ScenarioExecutor
                     var whileSettings = node.Config.Settings ?? new Dictionary<string, string>();
                     var conditionsJson = whileSettings.GetValueOrDefault("conditions", "[]");
                     var logic = whileSettings.GetValueOrDefault("logic", "and");
-                    var whileResult = ConditionEvaluator.EvaluateMultiple(conditionsJson, context.Scan, logic);
+                    var whileResult = _conditionEvaluator.EvaluateMultiple(conditionsJson, context.Scan, logic);
                     context.Variables["lastCondition"] = whileResult;
                     break;
 

@@ -5,10 +5,12 @@ namespace ScanBridge.Services;
 public class PostScanActionFactory : IPostScanActionFactory
 {
     private readonly ILoggerFactory _loggerFactory;
+    private readonly IServiceScopeFactory? _scopeFactory;
 
-    public PostScanActionFactory(ILoggerFactory loggerFactory)
+    public PostScanActionFactory(ILoggerFactory loggerFactory, IServiceScopeFactory? scopeFactory = null)
     {
         _loggerFactory = loggerFactory;
+        _scopeFactory = scopeFactory;
     }
 
     public IPostScanAction? Create(string type, Dictionary<string, string> settings)
@@ -24,7 +26,8 @@ public class PostScanActionFactory : IPostScanActionFactory
                 settings),
             "Export" => new ExportAction(
                 _loggerFactory.CreateLogger<ExportAction>(),
-                settings),
+                settings,
+                _scopeFactory),
             "WindowPaste" => new WindowPasteAction(
                 _loggerFactory.CreateLogger<WindowPasteAction>(),
                 settings),

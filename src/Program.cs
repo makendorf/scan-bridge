@@ -21,10 +21,12 @@ builder.Host.UseSerilog();
 
 builder.Services.AddSingleton<LogCollector>();
 builder.Services.AddSingleton<IBarcodeParser, SimpleBarcodeParser>();
-builder.Services.AddSingleton<IPostScanActionFactory, PostScanActionFactory>();
+builder.Services.AddSingleton<IPostScanActionFactory>(sp =>
+    new PostScanActionFactory(
+        sp.GetRequiredService<ILoggerFactory>(),
+        sp.GetRequiredService<IServiceScopeFactory>()));
 builder.Services.AddSingleton<ScanDispatcher>();
 builder.Services.AddSingleton<PostScanManager>();
-builder.Services.AddSingleton<GroupManager>();
 builder.Services.AddSingleton<ScanProcessorService>();
 builder.Services.AddSingleton<Func<SerialPortConfig, ReconnectConfig?, SerialPortService>>(sp =>
 {
@@ -41,6 +43,7 @@ builder.Services.AddSingleton<ScanTracker>();
 builder.Services.AddSingleton<ScanHistoryService>();
 builder.Services.AddSingleton<ScenarioService>();
 builder.Services.AddSingleton<ScenarioExecutor>();
+builder.Services.AddSingleton<ConditionEvaluator>();
 
 if (OperatingSystem.IsWindows())
 {
@@ -77,9 +80,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 var postScanManager = app.Services.GetRequiredService<PostScanManager>();
-var groupManager = app.Services.GetRequiredService<GroupManager>();
-var groupConfigs = groupManager.LoadGroups();
-postScanManager.Configure(groupConfigs);
 
 // Загрузка визуальных сценариев
 var scenarioService = app.Services.GetRequiredService<ScenarioService>();
@@ -112,10 +112,10 @@ app.MapFallbackToFile("layout.html");
 app.MapScannerEndpoints(manager, ReadScanners);
 app.MapLogEndpoints();
 app.MapPortEndpoints();
-app.MapPostScanEndpoints(postScanManager, groupManager);
 app.MapSettingsEndpoints(manager, ReadScanners);
 app.MapDashboardEndpoints(manager);
 app.MapScenarioEndpoints();
+app.MapCredentialEndpoints();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -140,7 +140,7 @@ app.Run();
 
 static void SeedFromLegacyConfig(AppDbContext db)
 {
-    if (db.Scanners.Any() || db.PostScanActionGroups.Any()) return;
+    if (db.Scanners.Any()) return;
 
     var configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
     if (!File.Exists(configPath)) return;

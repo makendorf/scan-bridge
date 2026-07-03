@@ -34,42 +34,99 @@
 /* ── Node Palette (top bar) ── */
 .scenario-node-palette {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 20px;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 16px;
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border-bottom: 1px solid var(--glass-border);
     flex-shrink: 0;
-    overflow-x: auto;
+    position: relative;
+    z-index: 100;
+    overflow: visible;
 }
 
-.palette-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--color-text-muted);
-    font-weight: 600;
-    white-space: nowrap;
+/* ── Palette Sections ── */
+.palette-section {
+    position: relative;
     flex-shrink: 0;
+}
+
+.palette-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-dim);
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+
+.palette-section-toggle:hover {
+    border-color: var(--color-primary-border);
+    background: var(--color-primary-dim);
+    color: var(--color-text);
+}
+
+.palette-section-toggle svg,
+.palette-section-toggle i {
+    width: 14px;
+    height: 14px;
+}
+
+.palette-chevron {
+    transition: transform var(--transition);
+}
+
+.palette-section.open .palette-chevron {
+    transform: rotate(180deg);
+}
+
+.palette-section-body {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 99999;
+    min-width: 200px;
+    max-width: 400px;
+    max-height: 350px;
+    overflow-y: auto;
+    padding: 6px;
+    margin-top: 4px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
+.palette-section-body.open {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .palette-node {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 7px 14px;
+    padding: 6px 12px;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     cursor: grab;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--color-text-dim);
     transition: all var(--transition);
     white-space: nowrap;
-    flex-shrink: 0;
 }
 
 .palette-node:hover {
@@ -106,6 +163,11 @@
 
 .palette-action i, .palette-action svg {
     color: var(--color-primary-light);
+}
+
+.palette-legacy {
+    opacity: 0.5;
+    font-size: 11px;
 }
 
 /* ── Canvas ── */

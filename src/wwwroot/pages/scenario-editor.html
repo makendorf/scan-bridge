@@ -14,62 +14,83 @@
         </div>
     </div>
     <div class="scenario-node-palette">
-        <span class="palette-label">Узлы:</span>
-        <div class="palette-node" draggable="true" data-type="Scanner">
-            <i data-lucide="scan-barcode"></i> Сканер
+        <!-- Вход -->
+        <div class="palette-section">
+            <button class="palette-section-toggle" onclick="togglePaletteSection(this)">
+                <i data-lucide="log-in"></i> Вход <i data-lucide="chevron-down" class="palette-chevron"></i>
+            </button>
+            <div class="palette-section-body open">
+                <div class="palette-node" draggable="true" data-type="Scanner">
+                    <i data-lucide="scan-barcode"></i> Сканер
+                </div>
+                <div class="palette-node palette-legacy" draggable="true" data-type="Start" title="Legacy — используйте Сканер">
+                    <i data-lucide="play"></i> Старт
+                </div>
+            </div>
         </div>
-        <div class="palette-node" draggable="true" data-type="Start" style="opacity:0.5" title="Legacy — используйте Сканер">
-            <i data-lucide="play"></i> Старт
+        <!-- Действия -->
+        <div class="palette-section">
+            <button class="palette-section-toggle" onclick="togglePaletteSection(this)">
+                <i data-lucide="zap"></i> Действия <i data-lucide="chevron-down" class="palette-chevron"></i>
+            </button>
+            <div class="palette-section-body">
+                <div class="palette-node palette-action" draggable="true" data-type="Log">
+                    <i data-lucide="scroll-text"></i> Лог
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Replacement">
+                    <i data-lucide="replace"></i> Замена
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="ClipboardPaste">
+                    <i data-lucide="clipboard-paste"></i> Буфер
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="WindowPaste">
+                    <i data-lucide="app-window"></i> Окно
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Export">
+                    <i data-lucide="download"></i> Экспорт
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Telegram">
+                    <i data-lucide="send"></i> Telegram
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Email">
+                    <i data-lucide="mail"></i> Email
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="DataEnrichment">
+                    <i data-lucide="database"></i> Обогащение
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Validation">
+                    <i data-lucide="check-circle"></i> Валидация
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Aggregation">
+                    <i data-lucide="layers"></i> Агрегация
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="DatabaseQuery">
+                    <i data-lucide="hard-drive"></i> Запрос БД
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Pause">
+                    <i data-lucide="pause"></i> Пауза
+                </div>
+            </div>
         </div>
-        <span class="palette-separator"></span>
-        <div class="palette-node palette-action" draggable="true" data-type="Log">
-            <i data-lucide="scroll-text"></i> Лог
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="Replacement">
-            <i data-lucide="replace"></i> Замена
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="ClipboardPaste">
-            <i data-lucide="clipboard-paste"></i> Буфер
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="WindowPaste">
-            <i data-lucide="app-window"></i> Окно
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="Export">
-            <i data-lucide="download"></i> Экспорт
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="Telegram">
-            <i data-lucide="send"></i> Telegram
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="Email">
-            <i data-lucide="mail"></i> Email
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="DataEnrichment">
-            <i data-lucide="database"></i> Обогащение
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="Validation">
-            <i data-lucide="check-circle"></i> Валидация
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="Aggregation">
-            <i data-lucide="layers"></i> Агрегация
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="DatabaseQuery">
-            <i data-lucide="hard-drive"></i> Запрос БД
-        </div>
-        <div class="palette-node palette-action" draggable="true" data-type="Pause">
-            <i data-lucide="pause"></i> Пауза
-        </div>
-        <span class="palette-separator"></span>
-        <div class="palette-node" draggable="true" data-type="Fork">
-            <i data-lucide="git-merge"></i> Ветвление
-        </div>
-        <div class="palette-node" draggable="true" data-type="Condition">
-            <i data-lucide="git-branch"></i> Условие
-        </div>
-        <div class="palette-node" draggable="true" data-type="While">
-            <i data-lucide="repeat"></i> Цикл
-        </div>
-        <div class="palette-node" draggable="true" data-type="End">
-            <i data-lucide="square"></i> Конец
+        <!-- Логика -->
+        <div class="palette-section">
+            <button class="palette-section-toggle" onclick="togglePaletteSection(this)">
+                <i data-lucide="git-branch"></i> Логика <i data-lucide="chevron-down" class="palette-chevron"></i>
+            </button>
+            <div class="palette-section-body">
+                <div class="palette-node" draggable="true" data-type="Fork">
+                    <i data-lucide="git-merge"></i> Ветвление
+                </div>
+                <div class="palette-node" draggable="true" data-type="Condition">
+                    <i data-lucide="git-branch"></i> Условие
+                </div>
+                <div class="palette-node" draggable="true" data-type="While">
+                    <i data-lucide="repeat"></i> Цикл
+                </div>
+                <div class="palette-node" draggable="true" data-type="End">
+                    <i data-lucide="square"></i> Конец
+                </div>
+            </div>
         </div>
     </div>
     <div class="scenario-canvas-wrapper">

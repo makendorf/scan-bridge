@@ -89,6 +89,69 @@ const PALETTE_NODE_TYPES = [
 
 let NODE_COUNTER = 0;
 
+/* ── Shared field select options for Condition/While ── */
+function getFieldSelectOptions(selectedField) {
+    return `
+        <optgroup label="Данные скана">
+            <option value="data" ${selectedField === 'data' ? 'selected' : ''}>Данные (parsed)</option>
+            <option value="raw" ${selectedField === 'raw' ? 'selected' : ''}>Сырые данные (raw)</option>
+            <option value="format" ${selectedField === 'format' ? 'selected' : ''}>Формат</option>
+            <option value="scanner" ${selectedField === 'scanner' ? 'selected' : ''}>Имя сканера</option>
+            <option value="isValid" ${selectedField === 'isValid' ? 'selected' : ''}>Валиден</option>
+        </optgroup>
+        <optgroup label="Файловая система">
+            <option value="fileExists" ${selectedField === 'fileExists' ? 'selected' : ''}>Файл существует</option>
+            <option value="fileContains" ${selectedField === 'fileContains' ? 'selected' : ''}>Файл содержит</option>
+            <option value="fileSize" ${selectedField === 'fileSize' ? 'selected' : ''}>Размер файла</option>
+            <option value="dirExists" ${selectedField === 'dirExists' ? 'selected' : ''}>Папка существует</option>
+        </optgroup>
+        <optgroup label="Время">
+            <option value="timeOfDay" ${selectedField === 'timeOfDay' ? 'selected' : ''}>Время (HH:mm)</option>
+            <option value="dayOfWeek" ${selectedField === 'dayOfWeek' ? 'selected' : ''}>День недели</option>
+            <option value="date" ${selectedField === 'date' ? 'selected' : ''}>Дата</option>
+        </optgroup>
+        <optgroup label="Система">
+            <option value="envVar" ${selectedField === 'envVar' ? 'selected' : ''}>Переменная окружения</option>
+            <option value="processRunning" ${selectedField === 'processRunning' ? 'selected' : ''}>Процесс запущен</option>
+            <option value="hostAvailable" ${selectedField === 'hostAvailable' ? 'selected' : ''}>Хост доступен</option>
+            <option value="diskFreeMB" ${selectedField === 'diskFreeMB' ? 'selected' : ''}>Свободно МБ</option>
+        </optgroup>
+        <optgroup label="Обработка">
+            <option value="jsonPath" ${selectedField === 'jsonPath' ? 'selected' : ''}>JSON поле</option>
+            <option value="stringLength" ${selectedField === 'stringLength' ? 'selected' : ''}>Длина строки</option>
+            <option value="startsWith" ${selectedField === 'startsWith' ? 'selected' : ''}>Начинается на</option>
+            <option value="endsWith" ${selectedField === 'endsWith' ? 'selected' : ''}>Заканчивается на</option>
+        </optgroup>`;
+}
+
+/* ── Palette Section Toggle ── */
+function togglePaletteSection(btn) {
+    const section = btn.closest('.palette-section');
+    const body = section.querySelector('.palette-section-body');
+    const isOpen = body.classList.contains('open');
+
+    // Close all other sections
+    document.querySelectorAll('.palette-section-body.open').forEach(el => {
+        el.classList.remove('open');
+        el.closest('.palette-section').classList.remove('open');
+    });
+
+    if (!isOpen) {
+        body.classList.add('open');
+        section.classList.add('open');
+    }
+}
+
+// Close palette sections when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.palette-section')) {
+        document.querySelectorAll('.palette-section-body.open').forEach(el => {
+            el.classList.remove('open');
+            el.closest('.palette-section').classList.remove('open');
+        });
+    }
+});
+
 /* ── Initialize Editor ── */
 async function initScenarioEditor(scenario, scenarioId) {
     editingScenarioConfig = scenario;
@@ -282,6 +345,8 @@ function openNodeSettingsModal(id) {
         // Use shared updateActionSettings with unique container IDs
         content.innerHTML = `<div id="nodeActionDescription"></div><div class="form-grid" id="nodeActionSettings"></div>`;
         updateActionSettings(nodeClass, existing, 'nodeActionSettings');
+        // Load credential dropdowns with saved values
+        loadCredentialSelects(existing);
 
     } else if (nodeClass === 'Scanner') {
         title.textContent = 'Настройки: Сканер';
@@ -317,17 +382,30 @@ function openNodeSettingsModal(id) {
     } else if (nodeClass === 'Condition') {
         title.textContent = 'Настройки: Условие';
         const settings = getDrawflowNodeSettings(id);
+        const isFileField = ['fileExists','fileContains','fileSize','dirExists'].includes(settings.field);
         content.innerHTML = `
             <div class="form-grid">
                 <div class="form-group">
                     <label>Поле</label>
-                    <select class="vs-setting" data-key="field">
-                        <option value="data" ${settings.field === 'data' ? 'selected' : ''}>Данные (parsed)</option>
-                        <option value="raw" ${settings.field === 'raw' ? 'selected' : ''}>Сырые данные (raw)</option>
-                        <option value="format" ${settings.field === 'format' ? 'selected' : ''}>Формат</option>
-                        <option value="scanner" ${settings.field === 'scanner' ? 'selected' : ''}>Имя сканера</option>
-                        <option value="isValid" ${settings.field === 'isValid' ? 'selected' : ''}>Валиден</option>
+                    <select class="vs-setting" data-key="field" onchange="onConditionFieldChange(${id})">
+                        ${getFieldSelectOptions(settings.field)}
                     </select>
+                </div>
+                <!-- Файловые настройки — показываются только для file полей -->
+                <div id="conditionFileFields" style="${isFileField ? '' : 'display:none'}">
+                    <div class="form-group">
+                        <label>Источник</label>
+                        <select class="vs-setting" data-key="fileType" onchange="onFileTypeChange(${id})">
+                            <option value="windows" ${settings.fileType === 'windows' ? 'selected' : ''}>Windows</option>
+                            <option value="ftp" ${settings.fileType === 'ftp' ? 'selected' : ''}>FTP</option>
+                            <option value="sftp" ${settings.fileType === 'sftp' ? 'selected' : ''}>SFTP</option>
+                        </select>
+                    </div>
+                    ${CredentialField.render('CredentialId', 'Учётные данные', '', settings.CredentialId)}
+                    <div class="form-group">
+                        <label>Путь к файлу</label>
+                        <input class="vs-setting" data-key="filePath" type="text" value="${escapeHtml(settings.filePath || '')}" placeholder="C:\\path\\file.txt или \\\\server\\share\\file.txt">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Оператор</label>
@@ -348,6 +426,8 @@ function openNodeSettingsModal(id) {
                 </div>
             </div>
         `;
+        _activeSettingsContainer = 'nodeSettingsContent';
+        loadCredentialSelects(settings);
     } else if (nodeClass === 'While') {
         title.textContent = 'Настройки: Цикл';
         const settings = getDrawflowNodeSettings(id);
@@ -387,6 +467,21 @@ function closeNodeSettingsModal() {
     }
     closeModal('nodeSettingsModal');
     modalNodeId = null;
+}
+
+/* ── Condition field change handlers ── */
+function onConditionFieldChange(nodeId) {
+    const field = document.querySelector('#nodeSettingsContent .vs-setting[data-key="field"]')?.value;
+    const isFileField = ['fileExists','fileContains','fileSize','dirExists'].includes(field);
+    const fileFields = document.getElementById('conditionFileFields');
+    if (fileFields) fileFields.style.display = isFileField ? '' : 'none';
+    if (isFileField) {
+        CredentialField.reloadVisible('nodeSettingsContent');
+    }
+}
+
+function onFileTypeChange(nodeId) {
+    CredentialField.reloadVisible('nodeSettingsContent');
 }
 
 function saveNodeSettingsFromModal() {
@@ -508,16 +603,15 @@ function renderWhileConditions(conditions) {
     const container = document.getElementById('whileConditions');
     if (!container) return;
 
-    container.innerHTML = conditions.map((c, i) => `
-        <div class="rule-row" style="margin-bottom:6px">
-            <select class="while-field" data-index="${i}" style="flex:1">
-                <option value="data" ${c.field === 'data' ? 'selected' : ''}>Данные</option>
-                <option value="raw" ${c.field === 'raw' ? 'selected' : ''}>Raw</option>
-                <option value="format" ${c.field === 'format' ? 'selected' : ''}>Формат</option>
-                <option value="scanner" ${c.field === 'scanner' ? 'selected' : ''}>Сканер</option>
-                <option value="isValid" ${c.field === 'isValid' ? 'selected' : ''}>Валиден</option>
+    container.innerHTML = conditions.map((c, i) => {
+        const isFileField = ['fileExists','fileContains','fileSize','dirExists'].includes(c.field);
+        const credId = c.credentialId || '';
+        return `
+        <div class="rule-row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px">
+            <select class="while-field" data-index="${i}" onchange="onWhileFieldChange(${i})" style="flex:1;min-width:120px">
+                ${getFieldSelectOptions(c.field)}
             </select>
-            <select class="while-operator" data-index="${i}" style="flex:1">
+            <select class="while-operator" data-index="${i}" style="flex:1;min-width:100px">
                 <option value="equals" ${c.operator === 'equals' ? 'selected' : ''}>Равно</option>
                 <option value="notEquals" ${c.operator === 'notEquals' ? 'selected' : ''}>Не равно</option>
                 <option value="contains" ${c.operator === 'contains' ? 'selected' : ''}>Содержит</option>
@@ -527,11 +621,37 @@ function renderWhileConditions(conditions) {
                 <option value="lessThan" ${c.operator === 'lessThan' ? 'selected' : ''}>Меньше</option>
                 <option value="isValid" ${c.operator === 'isValid' ? 'selected' : ''}>Валиден</option>
             </select>
-            <input class="while-value" data-index="${i}" type="text" value="${escapeHtml(c.value || '')}" placeholder="Значение" style="flex:1">
+            <input class="while-value" data-index="${i}" type="text" value="${escapeHtml(c.value || '')}" placeholder="Значение" style="flex:1;min-width:80px">
+            ${isFileField ? `
+                <select class="while-filetype" data-index="${i}" style="flex:1;min-width:80px">
+                    <option value="windows" ${c.fileType === 'windows' ? 'selected' : ''}>Windows</option>
+                    <option value="ftp" ${c.fileType === 'ftp' ? 'selected' : ''}>FTP</option>
+                    <option value="sftp" ${c.fileType === 'sftp' ? 'selected' : ''}>SFTP</option>
+                </select>
+                <select class="while-credential" data-index="${i}" id="whileCred_${i}" style="flex:1;min-width:100px">
+                    <option value="">Учётные данные</option>
+                </select>
+            ` : ''}
             <button class="btn-icon danger" onclick="removeWhileCondition(${i})"><i data-lucide="x"></i></button>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
     lucide.createIcons();
+    // Load credentials for file fields
+    conditions.forEach((c, i) => {
+        if (['fileExists','fileContains','fileSize','dirExists'].includes(c.field)) {
+            CredentialField.loadOptions(`whileCred_${i}`, c.credentialId);
+        }
+    });
+}
+
+function onWhileFieldChange(index) {
+    // Save current state of all conditions
+    const saved = collectWhileConditions();
+    // Update the changed field
+    const field = document.querySelector(`.rule-row:nth-child(${index + 1}) .while-field`)?.value || 'data';
+    saved[index].field = field;
+    // Re-render all conditions to show/hide file fields
+    renderWhileConditions(saved);
 }
 
 function addWhileCondition() {
@@ -552,7 +672,14 @@ function collectWhileConditions() {
         const field = row.querySelector('.while-field')?.value || 'data';
         const operator = row.querySelector('.while-operator')?.value || 'contains';
         const value = row.querySelector('.while-value')?.value || '';
-        result.push({ field, operator, value });
+        const cond = { field, operator, value };
+        // Collect file field settings
+        const isFileField = ['fileExists','fileContains','fileSize','dirExists'].includes(field);
+        if (isFileField) {
+            cond.fileType = row.querySelector('.while-filetype')?.value || 'windows';
+            cond.credentialId = row.querySelector('.while-credential')?.value || '';
+        }
+        result.push(cond);
     });
     return result;
 }

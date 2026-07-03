@@ -2,13 +2,15 @@
 ; Inno Setup 6+
 
 #define MyAppName "ScanBridge"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "ScanBridge"
-#define MyAppURL "https://github.com/ScanBridge/ScanBridge"
+#define MyAppURL "https://github.com/makendorf/scan-bridge"
 #define MyAppServiceName "ScanBridge"
 #define MyAppExeName "ScanBridge.exe"
-#define AspNetCoreVersion "10.0.9"
-#define AspNetCoreInstaller "aspnetcore-runtime-10.0.9-win-x64.exe"
+#define RuntimeVersion "10.0.9"
+#define DotNetRuntimeInstaller "dotnet-runtime-10.0.9-win-x64.exe"
+#define AspNetCoreRuntimeInstaller "aspnetcore-runtime-10.0.9-win-x64.exe"
+#define WindowsDesktopRuntimeInstaller "windowsdesktop-runtime-10.0.9-win-x64.exe"
 
 [Setup]
 AppId={{B8F3E4A2-1C5D-4E7F-9A2B-3C6D8E0F1A4B}
@@ -36,8 +38,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "installservice"; Description: "Установить как Windows Service"; GroupDescription: "Дополнительно:"; Flags: checkedonce
 
 [Files]
-Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#AspNetCoreInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "C:\Users\Makendorf\Documents\Project\ScanBridge\src\bin\Release\net10.0\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#DotNetRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "{#AspNetCoreRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "{#WindowsDesktopRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Icons]
 Name: "{group}\{#MyAppName} (Web UI)"; Filename: "http://localhost:5000"
@@ -45,7 +49,13 @@ Name: "{group}\Папка приложения"; Filename: "{app}"
 Name: "{group}\Удалить {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Run]
-Filename: "{tmp}\{#AspNetCoreInstaller}"; Parameters: "/install /quiet /norestart"; StatusMsg: "Установка ASP.NET Core Runtime..."; Flags: waituntilterminated; Check: not IsAspNetCoreRuntimeInstalled
+; .NET Runtime
+Filename: "{tmp}\{#DotNetRuntimeInstaller}"; Parameters: "/install /quiet /norestart"; StatusMsg: "Установка .NET Runtime {#RuntimeVersion}..."; Flags: waituntilterminated; Check: not IsDotNetRuntimeInstalled
+; ASP.NET Core Runtime
+Filename: "{tmp}\{#AspNetCoreRuntimeInstaller}"; Parameters: "/install /quiet /norestart"; StatusMsg: "Установка ASP.NET Core Runtime {#RuntimeVersion}..."; Flags: waituntilterminated; Check: not IsAspNetCoreRuntimeInstalled
+; Windows Desktop Runtime
+Filename: "{tmp}\{#WindowsDesktopRuntimeInstaller}"; Parameters: "/install /quiet /norestart"; StatusMsg: "Установка Windows Desktop Runtime {#RuntimeVersion}..."; Flags: waituntilterminated; Check: not IsWindowsDesktopRuntimeInstalled
+; Windows Service
 Filename: "sc"; Parameters: "create {#MyAppServiceName} binPath= ""{app}\{#MyAppExeName}"" start= auto"; Tasks: installservice; Flags: runhidden
 Filename: "sc"; Parameters: "description {#MyAppServiceName} ""Система управления сканерами штрихкодов и QR-кодов"""; Tasks: installservice; Flags: runhidden
 Filename: "sc"; Parameters: "start {#MyAppServiceName}"; Tasks: installservice; Flags: runhidden
@@ -55,7 +65,7 @@ Filename: "sc"; Parameters: "stop {#MyAppServiceName}"; Flags: runhidden
 Filename: "sc"; Parameters: "delete {#MyAppServiceName}"; Flags: runhidden
 
 [Code]
-function IsAspNetCoreRuntimeInstalled: Boolean;
+function IsDotNetRuntimeInstalled: Boolean;
 var
   ResultCode: Integer;
   Output: AnsiString;
@@ -64,20 +74,72 @@ var
 begin
   Result := False;
   TempFile := ExpandConstant('{tmp}\dotnet_check.txt');
-  
+
+  ExecResult := Exec(
+    'cmd.exe',
+    '/C dotnet --list-runtimes | findstr "Microsoft.NETCore.App" > "' + TempFile + '" 2>&1',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode
+  );
+
+  if ExecResult and (ResultCode = 0) then
+  begin
+    Result := LoadStringFromFile(TempFile, Output);
+    if Result then
+      Result := Pos('{#RuntimeVersion}', Output) > 0;
+  end;
+
+  DeleteFile(TempFile);
+end;
+
+function IsAspNetCoreRuntimeInstalled: Boolean;
+var
+  ResultCode: Integer;
+  Output: AnsiString;
+  TempFile: String;
+  ExecResult: Boolean;
+begin
+  Result := False;
+  TempFile := ExpandConstant('{tmp}\aspnetcore_check.txt');
+
   ExecResult := Exec(
     'cmd.exe',
     '/C dotnet --list-runtimes | findstr "AspNetCore" > "' + TempFile + '" 2>&1',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode
   );
-  
+
   if ExecResult and (ResultCode = 0) then
   begin
     Result := LoadStringFromFile(TempFile, Output);
     if Result then
-      Result := Pos('{#AspNetCoreVersion}', Output) > 0;
+      Result := Pos('{#RuntimeVersion}', Output) > 0;
   end;
-  
+
+  DeleteFile(TempFile);
+end;
+
+function IsWindowsDesktopRuntimeInstalled: Boolean;
+var
+  ResultCode: Integer;
+  Output: AnsiString;
+  TempFile: String;
+  ExecResult: Boolean;
+begin
+  Result := False;
+  TempFile := ExpandConstant('{tmp}\desktop_check.txt');
+
+  ExecResult := Exec(
+    'cmd.exe',
+    '/C dotnet --list-runtimes | findstr "WindowsDesktop" > "' + TempFile + '" 2>&1',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode
+  );
+
+  if ExecResult and (ResultCode = 0) then
+  begin
+    Result := LoadStringFromFile(TempFile, Output);
+    if Result then
+      Result := Pos('{#RuntimeVersion}', Output) > 0;
+  end;
+
   DeleteFile(TempFile);
 end;
 
@@ -87,9 +149,9 @@ var
   ServiceExists: Boolean;
 begin
   Result := True;
-  
+
   ServiceExists := Exec('sc', 'query ' + '{#MyAppServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
-  
+
   if ServiceExists then
   begin
     Exec('sc', 'stop ' + '{#MyAppServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
@@ -103,7 +165,7 @@ var
   ResultCode: Integer;
 begin
   Result := True;
-  
+
   Exec('sc', 'stop ' + '{#MyAppServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('sc', 'delete ' + '{#MyAppServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;

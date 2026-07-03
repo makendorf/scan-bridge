@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using ScanBridge.Models;
@@ -14,7 +15,9 @@ public class ScenarioExecutorTests
 
     public ScenarioExecutorTests()
     {
-        _executor = new ScenarioExecutor(_factoryMock.Object, _loggerMock.Object);
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var conditionEvaluator = new ConditionEvaluator(scopeFactoryMock.Object);
+        _executor = new ScenarioExecutor(_factoryMock.Object, _loggerMock.Object, conditionEvaluator);
     }
 
     [Fact]

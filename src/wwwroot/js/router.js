@@ -74,11 +74,11 @@ const Router = {
                 if (typeof load === 'function') load();
                 if (typeof loadSettings === 'function') loadSettings();
                 break;
-            case 'actions':
-                if (typeof loadGroups === 'function') loadGroups();
-                break;
             case 'scenarios':
                 if (typeof loadScenarios === 'function') loadScenarios();
+                break;
+            case 'credentials':
+                if (typeof loadCredentials === 'function') loadCredentials();
                 break;
             case 'scenario-editor':
                 if (typeof initScenarioEditor === 'function') {

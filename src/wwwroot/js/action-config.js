@@ -44,12 +44,8 @@ const ACTION_TYPES = {
             { key: 'Destination', label: 'Назначение', type: 'select', options: ['folder', 'ftp', 'sftp', 'http'], default: 'folder',
               optionLabels: { folder: 'Локальная папка', ftp: 'FTP-сервер', sftp: 'SFTP-сервер', http: 'HTTP POST' } },
             { key: 'FolderPath', label: 'Папка для файлов', type: 'text', default: 'C:\\Output', showWhen: 'Destination=folder' },
-            { key: 'FtpHost', label: 'Хост', type: 'text', default: '', showWhen: 'Destination=ftp|sftp' },
-            { key: 'FtpPort', label: 'Порт', type: 'number', default: '21', showWhen: 'Destination=ftp|sftp' },
-            { key: 'FtpUser', label: 'Логин', type: 'text', default: '', showWhen: 'Destination=ftp|sftp' },
-            { key: 'FtpPass', label: 'Пароль', type: 'text', default: '', showWhen: 'Destination=ftp|sftp' },
+            { key: 'CredentialId', label: 'Учётные данные', type: 'credential', showWhen: 'Destination=ftp|sftp' },
             { key: 'FtpRemotePath', label: 'Удалённая папка', type: 'text', default: '/', showWhen: 'Destination=ftp|sftp' },
-            { key: 'FtpPassive', label: 'Пассивный режим (FTP)', type: 'select', options: ['true', 'false'], default: 'true', showWhen: 'Destination=ftp' },
             { key: 'HttpUrl', label: 'URL API', type: 'text', default: 'http://localhost/api/scan', showWhen: 'Destination=http',
               hint: 'Полный URL эндпоинта для POST-запроса' },
             { key: 'HttpContentType', label: 'Content-Type', type: 'text', default: '', showWhen: 'Destination=http',
@@ -199,3 +195,185 @@ const TAG_SOURCES = [
     { value: 'ParsedContent', label: 'Распарсенный контент QR' },
     { value: 'Custom', label: 'Своё значение' }
 ];
+
+/* ── Action Settings Editor (shared with scenario editor) ── */
+let _activeSettingsContainer = 'actionSettings';
+let replacementRules = [];
+let tagRules = [];
+
+function updateActionSettings(type, existing, containerId) {
+    const targetId = containerId || 'actionSettings';
+    _activeSettingsContainer = targetId;
+    const container = document.getElementById(targetId);
+    const descEl = containerId ? null : document.getElementById('actionDescription');
+    const def = ACTION_TYPES[type];
+    if (descEl) descEl.innerHTML = def?.description ? `<strong>${esc(def.name)}</strong> — ${esc(def.description)}` : '';
+    if (!def || def.settings.length === 0) { container.innerHTML = ''; return; }
+    container.innerHTML = def.settings.map(s => {
+        if (s.type === 'replacements') {
+            const json = existing[s.key] || '[]';
+            replacementRules = [];
+            try { replacementRules = JSON.parse(json); } catch { replacementRules = []; }
+            return `<div class="form-group full" data-showwhen="${s.showWhen || ''}">
+                <label>${s.label}</label>
+                <div class="replacements-container"></div>
+                <button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="addReplacement()"><i data-lucide="plus" style="width:12px;height:12px"></i> Добавить замену</button>
+            </div>`;
+        }
+        if (s.type === 'tags') {
+            const json = existing[s.key] || '[]';
+            tagRules = [];
+            try { tagRules = JSON.parse(json); } catch { tagRules = []; }
+            if (tagRules.length === 0) {
+                tagRules = TAG_SOURCES.filter(t => t.value !== 'Custom').map(t => ({ Key: t.value, Source: t.value }));
+            }
+            return `<div class="form-group full" data-showwhen="${s.showWhen || ''}">
+                <label>${s.label}</label>
+                <div class="tags-container"></div>
+                <button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="addTag()"><i data-lucide="plus" style="width:12px;height:12px"></i> Добавить тег</button>
+            </div>`;
+        }
+        if (s.type === 'credential') {
+            return CredentialField.render(s.key, s.label, s.showWhen, existing[s.key]);
+        }
+        const val = existing[s.key] || s.default || '';
+        if (s.type === 'select') {
+            const opts = s.options.map(o => {
+                const lbl = s.optionLabels?.[o] || o;
+                return `<option value="${o}" ${o === val ? 'selected' : ''}>${lbl}</option>`;
+            }).join('');
+            return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}</label><select class="set-field" data-key="${s.key}" onchange="onSettingChange()">${opts}</select></div>`;
+        }
+        const hint = s.hint ? `<span class="hint-trigger"><i data-lucide="help-circle"></i><div class="hint-popup">${esc(s.hint)}</div></span>` : '';
+        return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}${hint}</label><input class="set-field" data-key="${s.key}" type="${s.type}" value="${esc(val)}"></div>`;
+    }).join('');
+    renderReplacements();
+    renderTags();
+    applyShowWhen();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+// Call this after updateActionSettings to load credential dropdowns
+function loadCredentialSelects(existing) {
+    CredentialField.loadAll(_activeSettingsContainer, existing);
+}
+
+// Reload credentials for visible selects (called on setting change)
+function reloadVisibleCredentialSelects() {
+    CredentialField.reloadVisible(_activeSettingsContainer);
+}
+
+function onSettingChange() {
+    applyShowWhen();
+    CredentialField.onSettingChange(_activeSettingsContainer);
+}
+
+function applyShowWhen() {
+    const container = document.getElementById(_activeSettingsContainer);
+    if (!container) return;
+    container.querySelectorAll('[data-showwhen]').forEach(g => {
+        const rule = g.getAttribute('data-showwhen');
+        if (!rule) { g.style.display = ''; return; }
+        const match = rule.match(/^(\w+)=(.+)$/);
+        if (!match) { g.style.display = ''; return; }
+        const [, key, values] = match;
+        const allowed = values.split('|');
+        const el = container.querySelector(`.set-field[data-key="${key}"]`);
+        const current = el ? el.value : '';
+        g.style.display = allowed.includes(current) ? '' : 'none';
+    });
+}
+
+/* ── Replacements ── */
+function renderReplacements() {
+    const container = document.querySelector(`#${_activeSettingsContainer} .replacements-container`);
+    if (!container) return;
+    if (replacementRules.length === 0) {
+        container.innerHTML = '<div style="color:var(--color-text-muted);font-size:12px;padding:6px 0">Нет замен</div>';
+        return;
+    }
+    container.innerHTML = replacementRules.map((r, i) => `
+        <div class="rule-row">
+            <input id="rep_find_${i}" value="${esc(r.Find || '')}" placeholder="Найти" style="flex:1">
+            <span class="arrow">→</span>
+            <input id="rep_replace_${i}" value="${esc(r.Replace || '')}" placeholder="Заменить на" style="flex:1">
+            <select id="rep_mode_${i}">
+                <option value="All" ${r.Mode === 'All' ? 'selected' : ''}>Везде</option>
+                <option value="Start" ${r.Mode === 'Start' ? 'selected' : ''}>В начале</option>
+                <option value="End" ${r.Mode === 'End' ? 'selected' : ''}>В конце</option>
+            </select>
+            <button class="btn-icon danger" onclick="removeReplacement(${i})"><i data-lucide="x"></i></button>
+        </div>
+    `).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function addReplacement() { replacementRules.push({ Find: '', Replace: '', Mode: 'All' }); renderReplacements(); }
+function removeReplacement(i) { replacementRules.splice(i, 1); renderReplacements(); }
+
+function collectReplacements() {
+    return replacementRules.map((r, i) => ({
+        Find: document.getElementById('rep_find_' + i)?.value ?? r.Find,
+        Replace: document.getElementById('rep_replace_' + i)?.value ?? r.Replace,
+        Mode: document.getElementById('rep_mode_' + i)?.value ?? r.Mode
+    }));
+}
+
+/* ── Tags ── */
+function renderTags() {
+    const container = document.querySelector(`#${_activeSettingsContainer} .tags-container`);
+    if (!container) return;
+    if (tagRules.length === 0) {
+        container.innerHTML = '<div style="color:var(--color-text-muted);font-size:12px;padding:6px 0">Нет тегов</div>';
+        return;
+    }
+    container.innerHTML = tagRules.map((t, i) => {
+        const srcOpts = TAG_SOURCES.map(s =>
+            `<option value="${s.value}" ${s.value === t.Source ? 'selected' : ''}>${s.label}</option>`
+        ).join('');
+        const isCustom = t.Source === 'Custom';
+        const valInput = isCustom
+            ? `<input id="tag_val_${i}" value="${esc(t.Value || '')}" placeholder="Значение" style="flex:1">`
+            : '';
+        return `<div class="rule-row">
+            <input id="tag_key_${i}" value="${esc(t.Key || '')}" placeholder="Имя тега" style="width:140px">
+            <select id="tag_src_${i}" onchange="onTagSourceChange(${i})" style="width:180px">${srcOpts}</select>
+            ${valInput}
+            <button class="btn-icon danger" onclick="removeTag(${i})"><i data-lucide="x"></i></button>
+        </div>`;
+    }).join('');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function onTagSourceChange(i) {
+    const sel = document.getElementById('tag_src_' + i);
+    if (sel) tagRules[i].Source = sel.value;
+    renderTags();
+}
+
+function addTag() { tagRules.push({ Key: '', Source: 'ParsedData', Value: '' }); renderTags(); }
+function removeTag(i) { tagRules.splice(i, 1); renderTags(); }
+
+function collectTags() {
+    return tagRules.map((t, i) => ({
+        Key: document.getElementById('tag_key_' + i)?.value ?? t.Key,
+        Source: document.getElementById('tag_src_' + i)?.value ?? t.Source,
+        Value: document.getElementById('tag_val_' + i)?.value ?? t.Value ?? ''
+    })).filter(t => t.Key);
+}
+
+function getActionSettings(type) {
+    const def = ACTION_TYPES[type];
+    if (!def) return {};
+    const container = document.getElementById(_activeSettingsContainer) || document.getElementById('nodeActionSettings') || document.getElementById('actionSettings');
+    const settings = {};
+    def.settings.forEach(s => {
+        if (s.type === 'replacements') { settings[s.key] = JSON.stringify(collectReplacements()); }
+        else if (s.type === 'tags') { settings[s.key] = JSON.stringify(collectTags()); }
+        else {
+            const el = container ? container.querySelector(`.set-field[data-key="${s.key}"]`) : null;
+            if (el) settings[s.key] = el.value;
+        }
+    });
+    return settings;
+}

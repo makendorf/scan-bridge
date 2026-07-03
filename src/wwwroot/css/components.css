@@ -202,33 +202,6 @@
 .rule-row input::placeholder { color: var(--color-text-muted); }
 .rule-row .arrow { color: var(--color-text-muted); font-size: 14px; }
 
-/* ── Group Cards ── */
-.group-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px; margin-bottom: 20px;
-}
-.group-card {
-    background: var(--glass-bg); backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg); padding: 20px;
-    cursor: pointer; transition: all var(--transition);
-}
-.group-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--color-primary-border); }
-.group-card-disabled { opacity: 0.5; }
-.group-card-header {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    margin-bottom: 12px;
-}
-.group-card-header h3 { font-size: 15px; font-weight: 600; color: var(--color-text); margin: 0; }
-.group-card-actions { display: flex; gap: 2px; }
-.group-card-scanners { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
-.group-card-footer {
-    display: flex; justify-content: space-between; align-items: center;
-    padding-top: 10px; border-top: 1px solid var(--color-border);
-}
-.group-card-count { font-size: 12px; color: var(--color-text-dim); }
-
 /* ── Checkbox Group ── */
 .checkbox-group { display: flex; flex-direction: column; gap: 8px; }
 .checkbox-label {

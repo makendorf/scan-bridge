@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
+using ScanBridge.Data;
+using ScanBridge.Data.Entities;
 using ScanBridge.Models;
 using ScanBridge.Services.PostScanActions.Export;
 
@@ -22,7 +24,7 @@ public class ExportAction : IPostScanAction
     private readonly List<TagConfig> _tags = new();
     private readonly string _destination;
 
-    public ExportAction(ILogger<ExportAction> logger, Dictionary<string, string> settings)
+    public ExportAction(ILogger<ExportAction> logger, Dictionary<string, string> settings, IServiceScopeFactory? scopeFactory = null)
     {
         _logger = logger;
 
@@ -32,7 +34,7 @@ public class ExportAction : IPostScanAction
 
         _destination = settings.TryGetValue("Destination", out var dest) ? dest.ToLowerInvariant() : "folder";
 
-        _strategy = CreateStrategy(settings, logger);
+        _strategy = CreateStrategy(settings, logger, scopeFactory);
 
         if (settings.TryGetValue("Tags", out var json) && !string.IsNullOrWhiteSpace(json))
         {
@@ -77,25 +79,12 @@ public class ExportAction : IPostScanAction
         }
     }
 
-    private IExportStrategy CreateStrategy(Dictionary<string, string> settings, ILogger logger)
+    private IExportStrategy CreateStrategy(Dictionary<string, string> settings, ILogger logger, IServiceScopeFactory? scopeFactory)
     {
         return _destination switch
         {
-            "ftp" => new FtpExportStrategy(
-                Get(settings, "FtpHost"),
-                GetInt(settings, "FtpPort", 21),
-                Get(settings, "FtpUser"),
-                Get(settings, "FtpPass"),
-                Get(settings, "FtpRemotePath", "/"),
-                !settings.TryGetValue("FtpPassive", out var pasv) || bool.TryParse(pasv, out var p) && p,
-                logger),
-            "sftp" => new SftpExportStrategy(
-                Get(settings, "FtpHost"),
-                GetInt(settings, "FtpPort", 21),
-                Get(settings, "FtpUser"),
-                Get(settings, "FtpPass"),
-                Get(settings, "FtpRemotePath", "/"),
-                logger),
+            "ftp" => CreateFtpStrategy(settings, logger, scopeFactory),
+            "sftp" => CreateSftpStrategy(settings, logger, scopeFactory),
             "http" => new HttpExportStrategy(
                 Get(settings, "HttpUrl"),
                 Get(settings, "HttpContentType", _format == "xml" ? "application/xml" : "application/json"),
@@ -103,6 +92,52 @@ public class ExportAction : IPostScanAction
                 logger),
             _ => new FolderExportStrategy(Get(settings, "FolderPath"), logger)
         };
+    }
+
+    private FtpExportStrategy CreateFtpStrategy(Dictionary<string, string> settings, ILogger logger, IServiceScopeFactory? scopeFactory)
+    {
+        if (settings.TryGetValue("CredentialId", out var credIdStr) && int.TryParse(credIdStr, out var credId) && scopeFactory != null)
+        {
+            var cred = LoadCredential(scopeFactory, credId);
+            if (cred != null)
+            {
+                var remotePath = Get(settings, "FtpRemotePath", "/");
+                return new FtpExportStrategy(cred.Host, cred.Port, cred.Username, cred.Password, remotePath, cred.PassiveMode, logger);
+            }
+        }
+        // Fallback to manual settings
+        return new FtpExportStrategy(
+            Get(settings, "FtpHost"), GetInt(settings, "FtpPort", 21),
+            Get(settings, "FtpUser"), Get(settings, "FtpPass"),
+            Get(settings, "FtpRemotePath", "/"),
+            !settings.TryGetValue("FtpPassive", out var pasv) || bool.TryParse(pasv, out var p) && p,
+            logger);
+    }
+
+    private SftpExportStrategy CreateSftpStrategy(Dictionary<string, string> settings, ILogger logger, IServiceScopeFactory? scopeFactory)
+    {
+        if (settings.TryGetValue("CredentialId", out var credIdStr) && int.TryParse(credIdStr, out var credId) && scopeFactory != null)
+        {
+            var cred = LoadCredential(scopeFactory, credId);
+            if (cred != null)
+            {
+                var remotePath = Get(settings, "FtpRemotePath", "/");
+                return new SftpExportStrategy(cred.Host, cred.Port, cred.Username, cred.Password, remotePath, logger);
+            }
+        }
+        // Fallback to manual settings
+        return new SftpExportStrategy(
+            Get(settings, "FtpHost"), GetInt(settings, "FtpPort", 22),
+            Get(settings, "FtpUser"), Get(settings, "FtpPass"),
+            Get(settings, "FtpRemotePath", "/"),
+            logger);
+    }
+
+    private static CredentialConfig? LoadCredential(IServiceScopeFactory scopeFactory, int id)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return db.Credentials.Find(id);
     }
 
     private static string Get(Dictionary<string, string> s, string key, string fallback = "")

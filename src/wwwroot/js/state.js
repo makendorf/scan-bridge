@@ -3,9 +3,7 @@
 const AppState = {
     _state: {
         scanners: [],
-        postScanGroups: [],
         scenarios: [],
-        currentGroupId: null,
         editingScenarioId: null,
         editingScenarioData: null,
         selectedNodeId: null,
@@ -28,11 +26,6 @@ const AppState = {
 
     resetPageState(page) {
         switch (page) {
-            case 'actions':
-                this._state.currentGroupId = null;
-                this._state.replacementRules = [];
-                this._state.tagRules = [];
-                break;
             case 'scenarios':
                 this._state.editingScenarioId = null;
                 this._state.editingScenarioData = null;

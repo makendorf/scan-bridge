@@ -5,75 +5,21 @@ namespace ScanBridge.Data;
 
 /// <summary>
 /// Контекст базы данных приложения ScanBridge.
-/// Управляет подключением к SQLite и определяет модель данных.
 /// </summary>
 public class AppDbContext : DbContext
 {
-    /// <summary>
-    /// Таблица конфигураций сканеров.
-    /// </summary>
     public DbSet<ScannerConfig> Scanners => Set<ScannerConfig>();
-
-    /// <summary>
-    /// Таблица групп пост-скан действий.
-    /// </summary>
-    public DbSet<PostScanActionGroup> PostScanActionGroups => Set<PostScanActionGroup>();
-
-    /// <summary>
-    /// Таблица пост-скан действий (привязаны к группам).
-    /// </summary>
-    public DbSet<PostScanAction> PostScanActions => Set<PostScanAction>();
-
-    /// <summary>
-    /// Таблица связей групп со сканерами.
-    /// </summary>
-    public DbSet<PostScanActionGroupScanner> PostScanActionGroupScanners => Set<PostScanActionGroupScanner>();
-
-    /// <summary>
-    /// Таблица настроек приложения (пары ключ-значение).
-    /// </summary>
+    public DbSet<CredentialConfig> Credentials => Set<CredentialConfig>();
     public DbSet<AppSetting> Settings => Set<AppSetting>();
-
-    /// <summary>
-    /// Таблица записей логов.
-    /// </summary>
     public DbSet<LogRecord> Logs => Set<LogRecord>();
-
-    /// <summary>
-    /// Таблица истории сканирований.
-    /// </summary>
     public DbSet<ScanHistory> ScanHistory => Set<ScanHistory>();
-
-    /// <summary>
-    /// Таблица событий переподключения сканеров.
-    /// </summary>
     public DbSet<ReconnectEvent> ReconnectEvents => Set<ReconnectEvent>();
-
-    /// <summary>
-    /// Таблица визуальных сценариев.
-    /// </summary>
     public DbSet<Scenario> Scenarios => Set<Scenario>();
-
-    /// <summary>
-    /// Таблица узлов сценариев.
-    /// </summary>
     public DbSet<ScenarioNode> ScenarioNodes => Set<ScenarioNode>();
-
-    /// <summary>
-    /// Таблица связей между узлами сценариев.
-    /// </summary>
     public DbSet<ScenarioConnection> ScenarioConnections => Set<ScenarioConnection>();
 
-    /// <summary>
-    /// Создаёт экземпляр контекста базы данных.
-    /// </summary>
-    /// <param name="options">Параметры подключения к БД.</param>
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    /// <summary>
-    /// Настраивает модель данных: индексы, ограничения длины полей, связи.
-    /// </summary>
-    /// <param name="modelBuilder">Построитель модели Entity Framework.</param>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ScannerConfig>(e =>
@@ -86,22 +32,15 @@ public class AppDbContext : DbContext
             e.Property(x => x.Handshake).HasMaxLength(30);
         });
 
-        modelBuilder.Entity<PostScanActionGroup>(e =>
+        modelBuilder.Entity<CredentialConfig>(e =>
         {
+            e.HasIndex(x => x.Name).IsUnique();
             e.Property(x => x.Name).HasMaxLength(100);
-        });
-
-        modelBuilder.Entity<PostScanActionGroupScanner>(e =>
-        {
-            e.HasIndex(x => new { x.GroupId, x.ScannerName }).IsUnique();
-            e.Property(x => x.ScannerName).HasMaxLength(100);
-            e.Ignore(x => x.Group);
-        });
-
-        modelBuilder.Entity<PostScanAction>(e =>
-        {
-            e.Property(x => x.Type).HasMaxLength(50);
-            e.Property(x => x.SettingsJson).HasMaxLength(4000);
+            e.Property(x => x.Type).HasMaxLength(20);
+            e.Property(x => x.Domain).HasMaxLength(100);
+            e.Property(x => x.Username).HasMaxLength(100);
+            e.Property(x => x.Password).HasMaxLength(200);
+            e.Property(x => x.Host).HasMaxLength(200);
         });
 
         modelBuilder.Entity<AppSetting>(e =>

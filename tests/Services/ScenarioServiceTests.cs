@@ -101,31 +101,6 @@ public class ScenarioServiceTests
     }
 
     [Fact]
-    public void MigrateGroup_CreatesLinearScenario()
-    {
-        var service = CreateService();
-        var group = new PostScanActionGroupConfig
-        {
-            Name = "TestGroup",
-            Enabled = true,
-            ScannerNames = new List<string> { "Scanner1" },
-            Actions = new List<PostScanActionConfig>
-            {
-                new() { Type = "Log", Enabled = true },
-                new() { Type = "ClipboardPaste", Enabled = true },
-            }
-        };
-
-        var scenario = service.MigrateGroup(group);
-
-        Assert.Equal("TestGroup", scenario.Name);
-        Assert.Equal(4, scenario.Nodes.Count); // Scanner + 2 Actions + End
-        Assert.Equal(3, scenario.Connections.Count);
-        Assert.Equal("Scanner", scenario.Nodes[0].Type);
-        Assert.Equal("End", scenario.Nodes[^1].Type);
-    }
-
-    [Fact]
     public void Validate_WithScannerNode_ReturnsSuccess()
     {
         var service = CreateService();

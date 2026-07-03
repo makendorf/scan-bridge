@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using ScanBridge.Models;
 using ScanBridge.Services.VisualScripting;
 
@@ -5,6 +7,14 @@ namespace ScanBridge.Tests.Services;
 
 public class ConditionEvaluatorTests
 {
+    private readonly ConditionEvaluator _evaluator;
+
+    public ConditionEvaluatorTests()
+    {
+        var scopeFactoryMock = new Mock<IServiceScopeFactory>();
+        _evaluator = new ConditionEvaluator(scopeFactoryMock.Object);
+    }
+
     [Fact]
     public void Equals_MatchingValue_ReturnsTrue()
     {
@@ -16,7 +26,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "hello" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -30,7 +40,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "world" };
 
-        Assert.False(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.False(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -44,7 +54,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "hello" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -58,7 +68,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "hello" };
 
-        Assert.False(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.False(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -72,7 +82,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "123" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -86,7 +96,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "abc" };
 
-        Assert.False(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.False(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -99,7 +109,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { IsValid = true };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -112,7 +122,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { IsValid = false };
 
-        Assert.False(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.False(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -121,7 +131,7 @@ public class ConditionEvaluatorTests
         var settings = new Dictionary<string, string>();
         var scan = new ScanResult { ParsedData = "test" };
 
-        Assert.False(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.False(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -135,7 +145,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "world" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -149,7 +159,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "hello" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -163,7 +173,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "20" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -177,7 +187,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ParsedData = "5" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -191,7 +201,7 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { RawData = "RAW123", ParsedData = "PARSED" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 
     [Fact]
@@ -205,6 +215,6 @@ public class ConditionEvaluatorTests
         };
         var scan = new ScanResult { ScannerName = "Scanner1" };
 
-        Assert.True(ConditionEvaluator.Evaluate(settings, scan));
+        Assert.True(_evaluator.Evaluate(settings, scan));
     }
 }

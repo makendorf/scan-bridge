@@ -55,11 +55,11 @@
             <a class="sidebar-link active" data-page="scanners" onclick="navigateTo('scanners')">
                 <i data-lucide="scan-barcode"></i> Сканеры
             </a>
-            <a class="sidebar-link" data-page="actions" onclick="navigateTo('actions')">
-                <i data-lucide="zap"></i> Действия
-            </a>
             <a class="sidebar-link" data-page="scenarios" onclick="navigateTo('scenarios')">
                 <i data-lucide="git-branch"></i> Сценарии
+            </a>
+            <a class="sidebar-link" data-page="credentials" onclick="navigateTo('credentials')">
+                <i data-lucide="key"></i> Учётные данные
             </a>
             <a class="sidebar-link" data-page="logs" onclick="navigateTo('logs')">
                 <i data-lucide="scroll-text"></i> Логи
@@ -71,10 +71,6 @@
             <div class="stat-row">
                 <span class="stat-label">Сканеров</span>
                 <span class="stat-value" id="statScanners">0</span>
-            </div>
-            <div class="stat-row">
-                <span class="stat-label">Действий</span>
-                <span class="stat-value" id="statActions">0</span>
             </div>
             <div class="stat-row">
                 <span class="stat-label">Портов</span>
@@ -142,103 +138,7 @@
         </div>
     </div>
 
-    <!-- ═══════ GROUP MODAL ═══════ -->
-    <div class="modal-overlay" id="groupModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 id="groupModalTitle">Группа</h2>
-                <button class="btn-icon" onclick="hideGroupModal()"><i data-lucide="x"></i></button>
-            </div>
-            <div id="groupModalScanners" style="margin-bottom:16px"></div>
-            <div class="glass-card-header" style="margin-bottom:12px">
-                <h2 style="font-size:14px"><i data-lucide="list"></i> Действия</h2>
-                <button class="btn btn-primary btn-sm" onclick="showAddGroupAction()">
-                    <i data-lucide="plus"></i> Добавить
-                </button>
-            </div>
-            <table class="data-table">
-                <thead><tr><th>Тип</th><th>Включено</th><th>Настройки</th><th></th></tr></thead>
-                <tbody id="groupActionsBody"></tbody>
-            </table>
-            <div id="groupActionsEmpty" class="empty-state" style="padding:24px">
-                <p>Нет действий в этой группе</p>
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-secondary" onclick="hideGroupModal()">Закрыть</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══════ GROUP SETTINGS MODAL ═══════ -->
-    <div class="modal-overlay" id="groupSettingsModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Настройки группы</h2>
-                <button class="btn-icon" onclick="hideGroupSettingsModal()"><i data-lucide="x"></i></button>
-            </div>
-            <input type="hidden" id="editGroupIndex" value="-1">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Имя группы</label>
-                    <input id="fGroupName" placeholder="напр. Уведомления Telegram">
-                </div>
-                <div class="form-group">
-                    <label>Включена</label>
-                    <select id="fGroupEnabled"><option value="true">Да</option><option value="false">Нет</option></select>
-                </div>
-            </div>
-            <div class="form-section-title">Привязка к сканерам</div>
-            <div id="groupScannerCheckboxes" class="checkbox-group"></div>
-            <div style="color:var(--color-text-muted);font-size:12px;margin-top:8px">Если ни один не выбран — группа работает со всеми сканерами</div>
-            <div class="form-actions">
-                <button class="btn btn-secondary" onclick="hideGroupSettingsModal()">Отмена</button>
-                <button class="btn btn-primary" onclick="saveGroupSettings()">
-                    <i data-lucide="check"></i> Сохранить
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══════ ACTION EDITOR MODAL ═══════ -->
-    <div class="modal-overlay" id="actionModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2 id="actionModalTitle">Добавить действие</h2>
-                <button class="btn-icon" onclick="hideActionModal()"><i data-lucide="x"></i></button>
-            </div>
-            <input type="hidden" id="editActionIndex" value="-1">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>Тип действия</label>
-                    <select id="fActionType">
-                        <option value="Log">Логирование (Log)</option>
-                        <option value="Replacement">Замена символов (Replacement)</option>
-                        <option value="ClipboardPaste">Вставка в активное окно (ClipboardPaste)</option>
-                        <option value="WindowPaste">Вставка в выбранное окно (WindowPaste)</option>
-                        <option value="Export">Экспорт (Export)</option>
-                        <option value="Telegram">Уведомление Telegram</option>
-                        <option value="Email">Уведомление Email</option>
-                        <option value="DataEnrichment">Обогащение данных</option>
-                        <option value="Validation">Валидация</option>
-                        <option value="Aggregation">Агрегация</option>
-                        <option value="DatabaseQuery">Запрос к БД</option>
-                        <option value="Pause">Пауза (ожидание)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Включено</label>
-                    <select id="fActionEnabled"><option value="true">Да</option><option value="false">Нет</option></select>
-                </div>
-            </div>
-            <div id="actionDescription" class="action-description"></div>
-            <div id="actionSettings" class="form-grid" style="margin-top:14px"></div>
-            <div class="form-actions">
-                <button class="btn btn-secondary" onclick="hideActionModal()">Отмена</button>
-                <button class="btn btn-primary" onclick="saveAction()">
-                    <i data-lucide="check"></i> Сохранить
-                </button>
-            </div>
-        </div>
+    <!-- ═══════ NODE SETTINGS MODAL ═══════ -->
     </div>
 
     <!-- ═══════ NODE SETTINGS MODAL ═══════ -->
@@ -291,8 +191,9 @@
     <script src="/js/utils.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/state.js"></script>
+    <script src="/js/credential-field.js"></script>
     <script src="/js/action-config.js"></script>
-    <script src="/js/actions.js"></script>
+    <script src="/js/credentials.js"></script>
     <script src="/js/scanners.js"></script>
     <script src="/js/logs.js"></script>
     <script src="/js/dashboard.js"></script>
