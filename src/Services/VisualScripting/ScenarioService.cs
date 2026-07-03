@@ -247,13 +247,13 @@ public class ScenarioService
             return new ValidationResult(false, errors);
         }
 
-        // Проверить наличие точки входа: Scanner или Start (legacy)
-        var hasScanner = config.Nodes.Any(n => n.Type == "Scanner");
-        var hasStart = config.Nodes.Any(n => n.Type == "Start");
+        // Проверить наличие точки входа: Scanner, Start (legacy), HttpTrigger, ScheduleTrigger, FileTrigger
+        var entryTypes = new HashSet<string> { "Scanner", "Start", "HttpTrigger", "ScheduleTrigger", "FileTrigger" };
+        var hasEntryNode = config.Nodes.Any(n => entryTypes.Contains(n.Type));
         var hasEnd = config.Nodes.Any(n => n.Type == "End");
 
-        if (!hasScanner && !hasStart)
-            errors.Add("Отсутствует узел Scanner (точка входа данных)");
+        if (!hasEntryNode)
+            errors.Add("Отсутствует узел-триггер (Сканер, HTTP, Расписание или Файл)");
         if (!hasEnd)
             errors.Add("Отсутствует узел End");
 
@@ -271,8 +271,8 @@ public class ScenarioService
         foreach (var nodeId in disconnected)
         {
             var node = config.Nodes.First(n => n.NodeId == nodeId);
-            // Entry/exit points (Start, Scanner, End) can be disconnected
-            if (node.Type != "Start" && node.Type != "Scanner" && node.Type != "End")
+            // Entry/exit points can be disconnected
+            if (!entryTypes.Contains(node.Type) && node.Type != "End")
             {
                 errors.Add($"Узел «{nodeId}» не связан с другими узлами");
             }

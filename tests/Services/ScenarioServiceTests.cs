@@ -52,7 +52,7 @@ public class ScenarioServiceTests
         var result = service.Validate(config);
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("Scanner"));
+        Assert.Contains(result.Errors, e => e.Contains("триггер"));
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public class ScenarioServiceTests
         var result = service.Validate(config);
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("Scanner"));
+        Assert.Contains(result.Errors, e => e.Contains("триггер"));
     }
 
     private ScenarioService CreateService()
