@@ -45,8 +45,8 @@ builder.Services.AddSingleton<ScenarioService>();
 builder.Services.AddSingleton<ScenarioExecutor>();
 builder.Services.AddSingleton<ConditionEvaluator>();
 builder.Services.AddSingleton<TriggerDispatcher>();
-builder.Services.AddSingleton<ScheduleService>();
-builder.Services.AddSingleton<FileWatcherService>();
+builder.Services.AddHostedService<ScheduleService>();
+builder.Services.AddHostedService<FileWatcherService>();
 
 if (OperatingSystem.IsWindows())
 {
@@ -89,13 +89,6 @@ var scenarioService = app.Services.GetRequiredService<ScenarioService>();
 var scenarioExecutor = app.Services.GetRequiredService<ScenarioExecutor>();
 var scenarioConfigs = scenarioService.GetAllWithGraph();
 postScanManager.ConfigureScenarios(scenarioConfigs, scenarioExecutor);
-
-// Запуск фоновых сервисов триггеров
-var scheduleService = app.Services.GetRequiredService<ScheduleService>();
-await scheduleService.StartAsync(app.Lifetime.ApplicationStopping);
-
-var fileWatcherService = app.Services.GetRequiredService<FileWatcherService>();
-await fileWatcherService.StartAsync(app.Lifetime.ApplicationStopping);
 
 List<SerialPortConfig> ReadScanners()
 {
