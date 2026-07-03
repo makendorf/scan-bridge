@@ -888,8 +888,9 @@ async function validateScenario() {
 
     // Client-side validation
     const errors = [];
+    const entryTypes = ['Start', 'Scanner', 'HttpTrigger', 'ScheduleTrigger', 'FileTrigger'];
     if (scenario.nodes.length === 0) errors.push('Сценарий не содержит узлов');
-    if (!scenario.nodes.some(n => n.type === 'Start')) errors.push('Отсутствует узел Start');
+    if (!scenario.nodes.some(n => entryTypes.includes(n.type))) errors.push('Отсутствует узел-триггер (Сканер, HTTP, Расписание или Файл)');
     if (!scenario.nodes.some(n => n.type === 'End')) errors.push('Отсутствует узел End');
 
     const content = document.getElementById('nodeSettingsContent');
