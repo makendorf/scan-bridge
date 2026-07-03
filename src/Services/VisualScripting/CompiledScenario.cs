@@ -10,15 +10,18 @@ public class CompiledScenario
     public ScenarioConfig Config { get; }
     public CompiledNode StartNode { get; }
     public List<(string ScannerName, CompiledNode Node)> ScannerNodes { get; }
+    public List<(string TriggerType, string TriggerKey, CompiledNode Node)> TriggerNodes { get; }
     public Dictionary<string, CompiledNode> Nodes { get; }
 
     public CompiledScenario(ScenarioConfig config, CompiledNode startNode,
         List<(string ScannerName, CompiledNode Node)> scannerNodes,
+        List<(string TriggerType, string TriggerKey, CompiledNode Node)> triggerNodes,
         Dictionary<string, CompiledNode> nodes)
     {
         Config = config;
         StartNode = startNode;
         ScannerNodes = scannerNodes;
+        TriggerNodes = triggerNodes;
         Nodes = nodes;
     }
 }

@@ -12,7 +12,7 @@ public class ScenarioExecutor
     private readonly ILogger<ScenarioExecutor> _logger;
     private readonly ConditionEvaluator _conditionEvaluator;
 
-    private static readonly HashSet<string> StructuralTypes = new() { "Start", "Scanner", "Condition", "End", "Fork", "While" };
+    private static readonly HashSet<string> StructuralTypes = new() { "Start", "Scanner", "HttpTrigger", "ScheduleTrigger", "FileTrigger", "Condition", "End", "Fork", "While" };
 
     public ScenarioExecutor(IPostScanActionFactory factory, ILogger<ScenarioExecutor> logger, ConditionEvaluator conditionEvaluator)
     {
@@ -105,17 +105,34 @@ public class ScenarioExecutor
 
         // Собрать Scanner узлы с именами сканеров
         var scannerNodes = new List<(string ScannerName, CompiledNode Node)>();
+        var triggerNodes = new List<(string TriggerType, string TriggerKey, CompiledNode Node)>();
+
         foreach (var scannerConfig in scannerNodeConfigs)
         {
             if (compiledNodes.TryGetValue(scannerConfig.NodeId, out var compiledScannerNode))
             {
                 var scannerName = scannerConfig.Settings?.GetValueOrDefault("scannerName") ?? "";
                 scannerNodes.Add((scannerName, compiledScannerNode));
+                triggerNodes.Add(("Scanner", scannerName, compiledScannerNode));
+            }
+        }
+
+        // Собрать другие триггерные узлы
+        foreach (var nodeConfig in scenario.Nodes.Where(n => n.Type is "HttpTrigger" or "ScheduleTrigger" or "FileTrigger"))
+        {
+            if (compiledNodes.TryGetValue(nodeConfig.NodeId, out var compiledNode))
+            {
+                var triggerType = nodeConfig.Type;
+                var triggerKey = nodeConfig.Settings?.GetValueOrDefault("routePath")
+                    ?? nodeConfig.Settings?.GetValueOrDefault("cronExpression")
+                    ?? nodeConfig.Settings?.GetValueOrDefault("watchPath")
+                    ?? "";
+                triggerNodes.Add((triggerType, triggerKey, compiledNode));
             }
         }
 
         var startNode = scannerNodes.Count > 0 ? scannerNodes[0].Node : compiledNodes.Values.First();
-        return new CompiledScenario(scenario, startNode, scannerNodes, compiledNodes);
+        return new CompiledScenario(scenario, startNode, scannerNodes, triggerNodes, compiledNodes);
     }
 
     /// <summary>
@@ -130,22 +147,63 @@ public class ScenarioExecutor
             CancellationToken = ct
         };
 
-        // Найти Scanner узлы, совпадающие с именем сканера
-        var matchingEntries = compiled.ScannerNodes
-            .Where(s => string.IsNullOrEmpty(s.ScannerName) ||
-                        string.Equals(s.ScannerName, scan.ScannerName, StringComparison.Ordinal))
+        var triggerType = scan.TriggerType;
+        var triggerKey = triggerType switch
+        {
+            "Scanner" => scan.ScannerName,
+            "Http" => scan.TriggerSource,
+            "Schedule" => scan.TriggerSource,
+            "FileWatcher" => scan.TriggerSource,
+            _ => scan.ScannerName
+        };
+
+        // Найти триггерные узлы, совпадающие с типом и ключом
+        var matchingEntries = compiled.TriggerNodes
+            .Where(t => MatchesTriggerNode(t, triggerType, triggerKey))
             .ToList();
 
-        // Fallback: если есть только legacy Start узлы (все с пустым именем) — выполняем все
-        if (matchingEntries.Count == 0 && compiled.ScannerNodes.All(s => string.IsNullOrEmpty(s.ScannerName)))
+        // Fallback: legacy Start/Scanner узлы
+        if (matchingEntries.Count == 0)
         {
-            matchingEntries = compiled.ScannerNodes;
+            matchingEntries = compiled.ScannerNodes
+                .Where(s => string.IsNullOrEmpty(s.ScannerName) ||
+                            string.Equals(s.ScannerName, scan.ScannerName, StringComparison.Ordinal))
+                .Select(s => ("Scanner", s.ScannerName, s.Node))
+                .ToList();
+
+            if (matchingEntries.Count == 0 && compiled.ScannerNodes.All(s => string.IsNullOrEmpty(s.ScannerName)))
+            {
+                matchingEntries = compiled.ScannerNodes
+                    .Select(s => ("Scanner", s.ScannerName, s.Node))
+                    .ToList();
+            }
         }
 
-        foreach (var (_, node) in matchingEntries)
+        foreach (var (_, _, node) in matchingEntries)
         {
             await ExecuteNodeAsync(node, context);
         }
+    }
+
+    private static bool MatchesTriggerNode((string TriggerType, string TriggerKey, CompiledNode Node) entry, string triggerType, string triggerKey)
+    {
+        if (entry.TriggerType != triggerType) return false;
+
+        // Scanner: match by scanner name
+        if (triggerType == "Scanner")
+        {
+            return string.IsNullOrEmpty(entry.TriggerKey) ||
+                   string.Equals(entry.TriggerKey, triggerKey, StringComparison.Ordinal);
+        }
+
+        // HTTP: match by route path
+        if (triggerType == "Http")
+        {
+            return string.Equals(entry.TriggerKey, triggerKey, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Schedule и File: все узлы этого типа совпадают
+        return true;
     }
 
     private async Task ExecuteNodeAsync(CompiledNode node, ScenarioContext context)
@@ -158,7 +216,10 @@ public class ScenarioExecutor
             {
                 case "Start":
                 case "Scanner":
-                    // Pass-through: Scanner — точка входа, ничего не делаем
+                case "HttpTrigger":
+                case "ScheduleTrigger":
+                case "FileTrigger":
+                    // Pass-through: триггерные узлы — точки входа, ничего не делаем
                     break;
 
                 case "Condition":

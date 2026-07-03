@@ -42,6 +42,27 @@ const VS_NODE_TEMPLATES = {
                 <div class="vs-scanner-display">все сканеры</div>
             </div>
         </div>`,
+    HttpTrigger: () => `
+        <div class="vs-node vs-node-trigger-http">
+            <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="globe"></i></span> HTTP</div>
+            <div class="vs-node-body">
+                <div class="vs-trigger-display">POST /api/trigger/...</div>
+            </div>
+        </div>`,
+    ScheduleTrigger: () => `
+        <div class="vs-node vs-node-trigger-schedule">
+            <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="clock"></i></span> Расписание</div>
+            <div class="vs-node-body">
+                <div class="vs-trigger-display">cron: ...</div>
+            </div>
+        </div>`,
+    FileTrigger: () => `
+        <div class="vs-node vs-node-trigger-file">
+            <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="file-text"></i></span> Файл</div>
+            <div class="vs-node-body">
+                <div class="vs-trigger-display">...</div>
+            </div>
+        </div>`,
     Start: () => `
         <div class="vs-node vs-node-start">
             <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="play"></i></span> Старт</div>
@@ -98,6 +119,7 @@ function getFieldSelectOptions(selectedField) {
             <option value="format" ${selectedField === 'format' ? 'selected' : ''}>Формат</option>
             <option value="scanner" ${selectedField === 'scanner' ? 'selected' : ''}>Имя сканера</option>
             <option value="isValid" ${selectedField === 'isValid' ? 'selected' : ''}>Валиден</option>
+            <option value="metadata" ${selectedField === 'metadata' ? 'selected' : ''}>Метаданные (ключ)</option>
         </optgroup>
         <optgroup label="Файловая система">
             <option value="fileExists" ${selectedField === 'fileExists' ? 'selected' : ''}>Файл существует</option>
@@ -218,7 +240,7 @@ function importScenarioToDrawflow(scenario) {
 
     // Add nodes
     scenario.nodes.forEach(node => {
-        const inputCount = (node.type === 'Start' || node.type === 'Scanner') ? 0 : 1;
+        const inputCount = (node.type === 'Start' || node.type === 'Scanner' || node.type === 'HttpTrigger' || node.type === 'ScheduleTrigger' || node.type === 'FileTrigger') ? 0 : 1;
         const outputCount = node.type === 'Condition' || node.type === 'While' ? 2 : (node.type === 'Fork' ? 3 : (node.type === 'End' ? 0 : 1));
         const template = VS_NODE_TEMPLATES[node.type];
         if (!template) return;
@@ -277,7 +299,7 @@ function setupPaletteDragDrop() {
             const x = e.clientX - rect.left + drawflowContainer.parentElement.scrollLeft;
             const y = e.clientY - rect.top + drawflowContainer.parentElement.scrollTop;
 
-            const inputCount = (type === 'Start' || type === 'Scanner') ? 0 : 1;
+            const inputCount = (type === 'Start' || type === 'Scanner' || type === 'HttpTrigger' || type === 'ScheduleTrigger' || type === 'FileTrigger') ? 0 : 1;
             const outputCount = type === 'Condition' || type === 'While' ? 2 : (type === 'Fork' ? 3 : (type === 'End' ? 0 : 1));
 
             drawflowEditor.addNode(
@@ -378,6 +400,65 @@ function openNodeSettingsModal(id) {
                 sel.appendChild(opt);
             });
         }).catch(() => {});
+
+    } else if (nodeClass === 'HttpTrigger') {
+        title.textContent = 'Настройки: HTTP Trigger';
+        const settings = getDrawflowNodeSettings(id);
+        content.innerHTML = `
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>HTTP метод</label>
+                    <select class="vs-setting" data-key="httpMethod">
+                        <option value="POST" ${settings.httpMethod === 'POST' ? 'selected' : ''}>POST</option>
+                        <option value="GET" ${settings.httpMethod === 'GET' ? 'selected' : ''}>GET</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Путь маршрута</label>
+                    <input class="vs-setting" data-key="routePath" type="text" value="${escapeHtml(settings.routePath || '')}" placeholder="webhook/inventory">
+                    <small style="color:var(--color-text-muted)">Полный URL: /api/trigger/{путь}</small>
+                </div>
+                <div class="form-group">
+                    <label>Auth Token (опционально)</label>
+                    <input class="vs-setting" data-key="authToken" type="text" value="${escapeHtml(settings.authToken || '')}" placeholder="Bearer token">
+                </div>
+            </div>`;
+
+    } else if (nodeClass === 'ScheduleTrigger') {
+        title.textContent = 'Настройки: Расписание';
+        const settings = getDrawflowNodeSettings(id);
+        content.innerHTML = `
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Cron выражение</label>
+                    <input class="vs-setting" data-key="cronExpression" type="text" value="${escapeHtml(settings.cronExpression || '')}" placeholder="0 9 * * 1-5">
+                    <small style="color:var(--color-text-muted)">Формат: мин час день_мес месяц день_нед</small>
+                </div>
+                <div class="form-group">
+                    <label>Тело запроса (JSON)</label>
+                    <textarea class="vs-setting" data-key="schedulePayload" rows="4" placeholder='{"action": "daily_report"}'>${escapeHtml(settings.schedulePayload || '')}</textarea>
+                    <small style="color:var(--color-text-muted)">Данные будут переданы как ParsedData</small>
+                </div>
+            </div>`;
+
+    } else if (nodeClass === 'FileTrigger') {
+        title.textContent = 'Настройки: Файловый watcher';
+        const settings = getDrawflowNodeSettings(id);
+        content.innerHTML = `
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Путь к папке/файлу</label>
+                    <input class="vs-setting" data-key="watchPath" type="text" value="${escapeHtml(settings.watchPath || '')}" placeholder="C:\\Data\\imports">
+                </div>
+                <div class="form-group">
+                    <label>Фильтр (glob)</label>
+                    <input class="vs-setting" data-key="watchFilter" type="text" value="${escapeHtml(settings.watchFilter || '*.*')}" placeholder="*.csv">
+                </div>
+                <div class="form-group">
+                    <label>Тип изменений</label>
+                    <input class="vs-setting" data-key="watchChangeTypes" type="text" value="${escapeHtml(settings.watchChangeTypes || 'Created,Changed')}" placeholder="Created,Changed">
+                </div>
+            </div>`;
 
     } else if (nodeClass === 'Condition') {
         title.textContent = 'Настройки: Условие';

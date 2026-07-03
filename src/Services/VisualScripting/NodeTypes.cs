@@ -9,6 +9,9 @@ public static class NodeTypes
     {
         ["Start"] = new("Старт", "Точка входа (legacy)", [], ["output_1"]),
         ["Scanner"] = new("Сканер", "Точка входа данных от сканера", [], ["output_1"]),
+        ["HttpTrigger"] = new("HTTP", "Точка входа: HTTP запрос", [], ["output_1"]),
+        ["ScheduleTrigger"] = new("Расписание", "Точка входа: по cron", [], ["output_1"]),
+        ["FileTrigger"] = new("Файл", "Точка входа: изменение файла", [], ["output_1"]),
         ["Fork"] = new("Ветвление", "Разделение потока на несколько веток", ["input_1"], ["output_1", "output_2", "output_3"]),
         ["Condition"] = new("Условие", "Ветвление по условию", ["input_1"], ["output_1", "output_2"]),
         ["While"] = new("Цикл", "Повторение тела цикла пока условие истинно", ["input_1"], ["output_1", "output_2"]),

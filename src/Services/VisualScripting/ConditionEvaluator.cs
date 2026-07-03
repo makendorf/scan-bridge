@@ -127,6 +127,11 @@ public class ConditionEvaluator
                 data = GetDiskFreeMB(value).ToString();
                 break;
 
+            // ── Метаданные ──
+            case "metadata":
+                data = scan.Metadata.TryGetValue(value, out var metaVal) ? metaVal : "";
+                break;
+
             // ── Обработка данных ──
             case "jsonPath":
                 data = ExtractJsonPath(scan.ParsedData, value);

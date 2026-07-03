@@ -30,6 +30,7 @@ public class ScenarioService
 
         return db.Scenarios
             .OrderBy(s => s.SortOrder)
+            .ToList()
             .Select(s => new ScenarioConfig
             {
                 Id = s.Id,
@@ -37,6 +38,10 @@ public class ScenarioService
                 Description = s.Description,
                 Enabled = s.Enabled,
                 ScannerNames = JsonSerializer.Deserialize<List<string>>(s.ScannerNamesJson) ?? new(),
+                TriggerType = Enum.TryParse<TriggerType>(s.TriggerType, out var tt) ? tt : TriggerType.Scanner,
+                TriggerSettings = s.TriggerSettingsJson != null
+                    ? JsonSerializer.Deserialize<TriggerSettingsConfig>(s.TriggerSettingsJson)
+                    : null,
                 Nodes = new(),
                 Connections = new()
             })
@@ -63,6 +68,10 @@ public class ScenarioService
             Description = s.Description,
             Enabled = s.Enabled,
             ScannerNames = JsonSerializer.Deserialize<List<string>>(s.ScannerNamesJson) ?? new(),
+            TriggerType = Enum.TryParse<TriggerType>(s.TriggerType, out var tt) ? tt : TriggerType.Scanner,
+            TriggerSettings = s.TriggerSettingsJson != null
+                ? JsonSerializer.Deserialize<TriggerSettingsConfig>(s.TriggerSettingsJson)
+                : null,
             Nodes = db.ScenarioNodes
                 .Where(n => n.ScenarioId == s.Id)
                 .Select(n => new ScenarioNodeConfig
@@ -130,6 +139,10 @@ public class ScenarioService
             Description = scenario.Description,
             Enabled = scenario.Enabled,
             ScannerNames = JsonSerializer.Deserialize<List<string>>(scenario.ScannerNamesJson) ?? new(),
+            TriggerType = Enum.TryParse<TriggerType>(scenario.TriggerType, out var tt) ? tt : TriggerType.Scanner,
+            TriggerSettings = scenario.TriggerSettingsJson != null
+                ? JsonSerializer.Deserialize<TriggerSettingsConfig>(scenario.TriggerSettingsJson)
+                : null,
             Nodes = nodes,
             Connections = connections
         };
@@ -149,6 +162,10 @@ public class ScenarioService
             Description = config.Description,
             Enabled = config.Enabled,
             ScannerNamesJson = JsonSerializer.Serialize(config.ScannerNames),
+            TriggerType = config.TriggerType.ToString(),
+            TriggerSettingsJson = config.TriggerSettings != null
+                ? JsonSerializer.Serialize(config.TriggerSettings)
+                : null,
             SortOrder = db.Scenarios.Count(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -180,6 +197,10 @@ public class ScenarioService
         scenario.Description = config.Description;
         scenario.Enabled = config.Enabled;
         scenario.ScannerNamesJson = JsonSerializer.Serialize(config.ScannerNames);
+        scenario.TriggerType = config.TriggerType.ToString();
+        scenario.TriggerSettingsJson = config.TriggerSettings != null
+            ? JsonSerializer.Serialize(config.TriggerSettings)
+            : null;
         scenario.UpdatedAt = DateTime.UtcNow;
 
         // Удалить старые узлы и связи

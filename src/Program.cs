@@ -44,6 +44,9 @@ builder.Services.AddSingleton<ScanHistoryService>();
 builder.Services.AddSingleton<ScenarioService>();
 builder.Services.AddSingleton<ScenarioExecutor>();
 builder.Services.AddSingleton<ConditionEvaluator>();
+builder.Services.AddSingleton<TriggerDispatcher>();
+builder.Services.AddSingleton<ScheduleService>();
+builder.Services.AddSingleton<FileWatcherService>();
 
 if (OperatingSystem.IsWindows())
 {
@@ -87,6 +90,13 @@ var scenarioExecutor = app.Services.GetRequiredService<ScenarioExecutor>();
 var scenarioConfigs = scenarioService.GetAllWithGraph();
 postScanManager.ConfigureScenarios(scenarioConfigs, scenarioExecutor);
 
+// Запуск фоновых сервисов триггеров
+var scheduleService = app.Services.GetRequiredService<ScheduleService>();
+await scheduleService.StartAsync(app.Lifetime.ApplicationStopping);
+
+var fileWatcherService = app.Services.GetRequiredService<FileWatcherService>();
+await fileWatcherService.StartAsync(app.Lifetime.ApplicationStopping);
+
 List<SerialPortConfig> ReadScanners()
 {
     return DbHelpers.ReadScanners(app.Services);
@@ -115,6 +125,7 @@ app.MapPortEndpoints();
 app.MapSettingsEndpoints(manager, ReadScanners);
 app.MapDashboardEndpoints(manager);
 app.MapScenarioEndpoints();
+app.MapTriggerEndpoints();
 app.MapCredentialEndpoints();
 
 using (var scope = app.Services.CreateScope())

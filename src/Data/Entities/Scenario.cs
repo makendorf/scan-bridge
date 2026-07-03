@@ -31,6 +31,18 @@ public class Scenario
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>
+    /// Тип триггера: Scanner, Http, Schedule, FileWatcher.
+    /// </summary>
+    [MaxLength(20)]
+    public string TriggerType { get; set; } = "Scanner";
+
+    /// <summary>
+    /// JSON настройки триггера (route, cron, file path и т.д.).
+    /// </summary>
+    [MaxLength(4000)]
+    public string? TriggerSettingsJson { get; set; }
+
     [NotMapped]
     public List<ScenarioNode> Nodes { get; set; } = new();
 

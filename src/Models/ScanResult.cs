@@ -50,4 +50,14 @@ public class ScanResult
     /// Дополнительные метаданные, например результат обогащения данных.
     /// </summary>
     public Dictionary<string, string> Metadata { get; set; } = new();
+
+    /// <summary>
+    /// Идентификатор триггера (имя сканера, route, путь к файлу и т.д.).
+    /// </summary>
+    public string TriggerSource { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Тип триггера: Scanner, Http, Schedule, FileWatcher.
+    /// </summary>
+    public string TriggerType { get; set; } = "Scanner";
 }

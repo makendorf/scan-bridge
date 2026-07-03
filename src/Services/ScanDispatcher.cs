@@ -37,9 +37,8 @@ public class ScanDispatcher
             if (compiled != null)
             {
                 newScenarios.Add(compiled);
-                _logger.LogInformation("Сценарий «{Name}»: {NodeCount} узлов, сканеры: {Scanners}",
-                    config.Name, config.Nodes.Count,
-                    config.ScannerNames.Count > 0 ? string.Join(", ", config.ScannerNames) : "все");
+                _logger.LogInformation("Сценарий «{Name}»: {NodeCount} узлов, триггер: {Trigger}",
+                    config.Name, config.Nodes.Count, config.TriggerType);
             }
         }
 
@@ -60,8 +59,10 @@ public class ScanDispatcher
     /// </summary>
     public async Task ExecuteAllAsync(ScanResult scan, CancellationToken ct)
     {
+        var triggerType = scan.TriggerType;
+
         var matchingScenarios = _scenarios
-            .Where(s => MatchesScanner(s.Config, scan.ScannerName))
+            .Where(s => MatchesTrigger(s.Config, triggerType, scan))
             .ToList();
 
         if (matchingScenarios.Count == 0) return;
@@ -78,17 +79,38 @@ public class ScanDispatcher
     /// </summary>
     public int GetScenarioCount() => _scenarios.Count;
 
-    private static bool MatchesScanner(ScenarioConfig scenarioConfig, string scannerName)
+    private static bool MatchesTrigger(ScenarioConfig config, string triggerType, ScanResult scan)
     {
-        if (scenarioConfig.ScannerNames.Count == 0) return true;
-        return scenarioConfig.ScannerNames.Contains(scannerName, StringComparer.Ordinal);
+        // Scanner trigger — существующая логика
+        if (triggerType == "Scanner")
+        {
+            if (config.TriggerType != TriggerType.Scanner) return false;
+            if (config.ScannerNames.Count == 0) return true;
+            return config.ScannerNames.Contains(scan.ScannerName, StringComparer.Ordinal);
+        }
+
+        // HTTP trigger
+        if (triggerType == "Http" && config.TriggerType == TriggerType.Http)
+        {
+            var route = config.TriggerSettings?.RoutePath ?? "";
+            return string.Equals(route, scan.TriggerSource, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Schedule trigger
+        if (triggerType == "Schedule" && config.TriggerType == TriggerType.Schedule)
+            return true;
+
+        // File watcher trigger
+        if (triggerType == "FileWatcher" && config.TriggerType == TriggerType.FileWatcher)
+            return true;
+
+        return false;
     }
 
     private async Task ExecuteScenarioAsync(CompiledScenario scenario, ScanResult scan, CancellationToken ct)
     {
         try
         {
-            var context = new ScenarioContext { Scan = scan, CancellationToken = ct };
             await _scenarioExecutor!.ExecuteAsync(scenario, scan, ct);
         }
         catch (OperationCanceledException) { throw; }
