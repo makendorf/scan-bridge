@@ -45,8 +45,10 @@ builder.Services.AddSingleton<ScenarioService>();
 builder.Services.AddSingleton<ScenarioExecutor>();
 builder.Services.AddSingleton<ConditionEvaluator>();
 builder.Services.AddSingleton<TriggerDispatcher>();
-builder.Services.AddHostedService<ScheduleService>();
-builder.Services.AddHostedService<FileWatcherService>();
+builder.Services.AddSingleton<ScheduleService>();
+builder.Services.AddSingleton<FileWatcherService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<FileWatcherService>());
 
 if (OperatingSystem.IsWindows())
 {
