@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace ScanBridge.Models;
 
 /// <summary>
 /// Тип триггера сценария.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum TriggerType
 {
     Scanner = 0,

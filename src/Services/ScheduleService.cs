@@ -45,6 +45,7 @@ public class ScheduleService : IHostedService, IDisposable
 
         foreach (var scenario in scenarios)
         {
+            if (!scenario.Enabled) continue;
             if (scenario.TriggerType != TriggerType.Schedule) continue;
             if (scenario.TriggerSettings?.CronExpression == null) continue;
 
@@ -73,7 +74,7 @@ public class ScheduleService : IHostedService, IDisposable
                 var nextRun = sched.GetNextOccurrence(now.AddMinutes(-1));
                 if (nextRun <= now && nextRun > now.AddMinutes(-1))
                 {
-                    _logger.LogInformation("Cron триггер: сценарий ID={Id}", scenarioId);
+                    _logger.LogDebug("Cron триггер: сценарий ID={Id}", scenarioId);
                     _ = ExecuteScheduleAsync(payload);
                 }
             }

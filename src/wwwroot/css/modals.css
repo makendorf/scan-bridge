@@ -14,6 +14,25 @@
     overflow-y: auto; box-shadow: var(--shadow-lg);
     animation: modalIn 0.25s ease;
 }
+.modal.modal-wide { max-width: 900px; }
+
+/* ── Metadata Guide Modal Body ── */
+.metadata-guide-modal-body { max-height: 65vh; overflow-y: auto; padding-right: 8px; }
+.metadata-guide-modal-body h2 { font-size: 16px; font-weight: 600; color: var(--color-text); margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--color-border); }
+.metadata-guide-modal-body h2:first-child { margin-top: 0; }
+.metadata-guide-modal-body h3 { font-size: 13px; font-weight: 600; color: var(--color-text); margin: 14px 0 6px; display: flex; align-items: center; gap: 6px; }
+.metadata-guide-modal-body h3 i { width: 14px; height: 14px; color: var(--color-primary-light); }
+.metadata-guide-modal-body p { font-size: 12px; color: var(--color-text-secondary); line-height: 1.6; margin: 6px 0; }
+.metadata-guide-modal-body ul, .metadata-guide-modal-body ol { font-size: 12px; color: var(--color-text-secondary); line-height: 1.8; padding-left: 18px; }
+.metadata-guide-modal-body table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 8px 0; }
+.metadata-guide-modal-body th { text-align: left; padding: 6px 10px; background: var(--color-surface); color: var(--color-text-dim); font-weight: 600; border-bottom: 1px solid var(--color-border); }
+.metadata-guide-modal-body td { padding: 6px 10px; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary); vertical-align: top; }
+.metadata-guide-modal-body td code { font-size: 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 3px; padding: 1px 4px; color: var(--color-primary-light); }
+.metadata-guide-modal-body .guide-node { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 10px; }
+.metadata-guide-modal-body .guide-tip { background: rgba(59, 130, 246, 0.08); border-left: 3px solid var(--color-info); padding: 8px 12px; font-size: 11px; color: var(--color-text-secondary); margin: 8px 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.metadata-guide-modal-body .guide-example { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11px; color: var(--color-text-secondary); margin: 8px 0; }
+.metadata-guide-modal-body .guide-example pre { margin: 6px 0 0; font-size: 10px; white-space: pre-wrap; color: var(--color-text); }
+.metadata-guide-modal-body .guide-note { font-size: 11px; color: var(--color-text-dim); font-style: italic; }
 @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .modal-header {
     display: flex; justify-content: space-between; align-items: center;

@@ -18,6 +18,99 @@ const ACTION_ICONS = {
     Aggregation: 'layers',
     DatabaseQuery: 'hard-drive',
     Pause: 'pause',
+    Service: 'power',
+};
+
+// Metadata that each node type passes downstream
+const NODE_METADATA = {
+    Scanner: [
+        { key: 'data', desc: 'Распознанные данные → ParsedData' },
+        { key: 'raw', desc: 'Сырые данные → RawData' },
+        { key: 'format', desc: 'Формат штрихкода → Format' },
+        { key: 'isValid', desc: 'Валидность → IsValid' },
+    ],
+    HttpTrigger: [
+        { key: 'data', desc: 'Тело запроса → ParsedData' },
+        { key: 'raw', desc: 'Исходные данные → RawData' },
+        { key: 'format', desc: 'Формат: Http → Format' },
+        { key: 'isValid', desc: 'Валидность: true → IsValid' },
+    ],
+    ScheduleTrigger: [
+        { key: 'data', desc: 'Payload JSON → ParsedData' },
+        { key: 'raw', desc: 'Исходные данные → RawData' },
+        { key: 'format', desc: 'Формат: Schedule → Format' },
+        { key: 'isValid', desc: 'Валидность: true → IsValid' },
+    ],
+    FileTrigger: [
+        { key: 'data', desc: 'Содержимое файла → ParsedData' },
+        { key: 'filePath', desc: 'Путь к файлу → metadata' },
+        { key: 'format', desc: 'Формат: File → Format' },
+    ],
+    Replacement: [
+        { key: 'data', desc: 'Результат замены → ParsedData (если сработала)' },
+        { key: 'replacementApplied', desc: 'true/false — была ли замена' },
+    ],
+    ClipboardPaste: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'pasteSuccess', desc: 'true/false — результат вставки' },
+        { key: 'pasteError', desc: 'Причина ошибки (если есть)' },
+    ],
+    WindowPaste: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'pasteSuccess', desc: 'true/false — результат вставки' },
+        { key: 'pasteError', desc: 'Причина ошибки (если есть)' },
+    ],
+    Export: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'exportSuccess', desc: 'true/false — результат экспорта' },
+        { key: 'exportFilename', desc: 'Имя сохранённого файла' },
+        { key: 'exportError', desc: 'Причина ошибки (если есть)' },
+    ],
+    Telegram: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'telegramSuccess', desc: 'true/false — результат отправки' },
+        { key: 'telegramError', desc: 'Причина ошибки (если есть)' },
+    ],
+    Email: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'emailSuccess', desc: 'true/false — результат отправки' },
+        { key: 'emailError', desc: 'Причина ошибки (если есть)' },
+    ],
+    DataEnrichment: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'enriched', desc: 'Ответ от внешнего API → metadata' },
+        { key: 'enrichmentSuccess', desc: 'true/false — результат обогащения' },
+        { key: 'enrichmentError', desc: 'Причина ошибки (если есть)' },
+    ],
+    Validation: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'validationPassed', desc: 'true/false — прошли ли данные валидацию' },
+    ],
+    DatabaseQuery: [
+        { key: 'data', desc: 'Результат SQL → ParsedData (заменяет данные)' },
+        { key: 'querySuccess', desc: 'true/false — результат запроса' },
+        { key: 'queryError', desc: 'Причина ошибки (если есть)' },
+    ],
+    Aggregation: [
+        { key: 'data', desc: 'JSON/CSV пакет → ParsedData (заменяет данные)' },
+        { key: 'batchCount', desc: 'Количество элементов в пакете' },
+    ],
+    Service: [
+        { key: 'data', desc: 'Результат операции → ParsedData' },
+        { key: 'serviceSuccess', desc: 'true/false — результат операции' },
+        { key: 'serviceStatus', desc: 'Статус службы после операции' },
+        { key: 'serviceAction', desc: 'Выполнено действие (start/stop/restart)' },
+        { key: 'serviceName', desc: 'Имя службы' },
+        { key: 'serviceError', desc: 'Причина ошибки (если есть)' },
+    ],
+    Condition: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'lastCondition', desc: 'true/false — результат условия' },
+    ],
+    While: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'lastCondition', desc: 'true/false — результат условия' },
+    ],
 };
 
 // Generate templates for each action type
@@ -224,6 +317,60 @@ async function initScenarioEditor(scenario, scenarioId) {
             openNodeSettingsModal(id);
         }
     });
+
+    // Right-click context menu on nodes
+    let contextNodeId = null;
+    const contextMenu = document.getElementById('nodeContextMenu');
+
+    container.addEventListener('contextmenu', (e) => {
+        const nodeEl = e.target.closest('.drawflow-node');
+        if (!nodeEl) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        contextNodeId = nodeEl.id.replace('node-', '');
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = e.clientX + 'px';
+        contextMenu.style.top = e.clientY + 'px';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+
+    document.addEventListener('click', () => {
+        contextMenu.style.display = 'none';
+        contextNodeId = null;
+    });
+
+    window.contextMenuCopy = function() {
+        if (!contextNodeId || !drawflowEditor) return;
+        const data = drawflowEditor.export();
+        const nodeData = data.drawflow?.Home?.data?.[contextNodeId];
+        if (!nodeData) return;
+
+        const nodeClass = nodeData.class;
+        const isAction = ACTION_TYPES.hasOwnProperty(nodeClass);
+        const actionType = isAction ? nodeClass : (nodeData.data?.settings?.__actionType || null);
+        const inputCount = (nodeClass === 'Start' || nodeClass === 'Scanner' || nodeClass === 'HttpTrigger' || nodeClass === 'ScheduleTrigger' || nodeClass === 'FileTrigger') ? 0 : 1;
+        const outputCount = nodeClass === 'Condition' || nodeClass === 'While' ? 2 : (nodeClass === 'Fork' ? 3 : (nodeClass === 'End' ? 0 : 1));
+        const template = VS_NODE_TEMPLATES[nodeClass];
+        if (!template) return;
+
+        const settings = nodeData.data?.settings || {};
+        const newId = drawflowEditor.addNode(
+            nodeClass, inputCount, outputCount,
+            nodeData.pos_x + 40, nodeData.pos_y + 40,
+            nodeClass, { settings: JSON.parse(JSON.stringify(settings)) }, template()
+        );
+        NODE_COUNTER = Math.max(NODE_COUNTER, parseInt(newId) + 1);
+        lucide.createIcons();
+        showToast('Узел скопирован', 'success');
+        contextMenu.style.display = 'none';
+    };
+
+    window.contextMenuDelete = function() {
+        if (!contextNodeId || !drawflowEditor) return;
+        drawflowEditor.removeNodeId('node-' + contextNodeId);
+        contextMenu.style.display = 'none';
+    };
 
     // If editing existing scenario, import it
     if (scenario && scenario.nodes && scenario.nodes.length > 0) {
@@ -504,7 +651,12 @@ function openNodeSettingsModal(id) {
                 </div>
                 <div class="form-group">
                     <label>Значение</label>
-                    <input class="vs-setting" data-key="value" type="text" value="${escapeHtml(settings.value || '')}" placeholder="Значение для сравнения">
+                    <input class="vs-setting" data-key="value" type="text" value="${escapeHtml(settings.value || '')}" placeholder="Ключ метаданных или значение">
+                </div>
+                <div class="form-group" id="conditionMetadataExpected" style="${settings.field === 'metadata' ? '' : 'display:none'}">
+                    <label>Ожидаемое значение</label>
+                    <input class="vs-setting" data-key="metadataExpected" type="text" value="${escapeHtml(settings.metadataExpected || '')}" placeholder="true, false, Running...">
+                    <small style="color:var(--color-text-muted)">С чем сравнивать значение метаданных</small>
                 </div>
             </div>
         `;
@@ -539,6 +691,18 @@ function openNodeSettingsModal(id) {
         content.innerHTML = `<p class="hint">Настройки для типа «${escapeHtml(nodeClass)}» отсутствуют</p>`;
     }
 
+    // Append metadata info block
+    const meta = NODE_METADATA[nodeClass];
+    if (meta && meta.length > 0) {
+        content.innerHTML += `
+            <div class="metadata-info-block">
+                <div class="metadata-info-title"><i data-lucide="database" style="width:13px;height:13px"></i> Метаданные этого узла</div>
+                <div class="metadata-info-list">
+                    ${meta.map(m => `<div class="metadata-info-item"><code>${escapeHtml(m.key)}</code> — ${escapeHtml(m.desc)}</div>`).join('')}
+                </div>
+            </div>`;
+    }
+
     loadNodeSettingsToUI(id, isAction);
     openModal('nodeSettingsModal');
 }
@@ -555,8 +719,11 @@ function closeNodeSettingsModal() {
 function onConditionFieldChange(nodeId) {
     const field = document.querySelector('#nodeSettingsContent .vs-setting[data-key="field"]')?.value;
     const isFileField = ['fileExists','fileContains','fileSize','dirExists'].includes(field);
+    const isMetadataField = field === 'metadata';
     const fileFields = document.getElementById('conditionFileFields');
+    const metaExpected = document.getElementById('conditionMetadataExpected');
     if (fileFields) fileFields.style.display = isFileField ? '' : 'none';
+    if (metaExpected) metaExpected.style.display = isMetadataField ? '' : 'none';
     if (isFileField) {
         CredentialField.reloadVisible('nodeSettingsContent');
     }
@@ -832,6 +999,24 @@ async function doSaveScenario(scenario) {
     }
 }
 
+/* ── Metadata Guide Modal ── */
+let _metadataGuideLoaded = false;
+async function openMetadataGuide() {
+    if (!_metadataGuideLoaded) {
+        try {
+            const res = await fetch('/pages/scenario-metadata.html');
+            const html = await res.text();
+            // Extract only the guide-content div, strip the outer wrapper and <style>
+            const match = html.match(/<div class="guide-content">([\s\S]*?)<\/div>\s*<style>[\s\S]*?<\/style>/);
+            document.getElementById('metadataGuideContent').innerHTML = match ? match[1] : html;
+            _metadataGuideLoaded = true;
+        } catch (e) {
+            document.getElementById('metadataGuideContent').innerHTML = '<p>Не удалось загрузить справочник</p>';
+        }
+    }
+    openModal('metadataGuideModal');
+}
+
 /* ── Export Drawflow to Scenario DTO ── */
 function exportDrawflowToScenario(exportData) {
     const nodes = [];
@@ -868,12 +1053,46 @@ function exportDrawflowToScenario(exportData) {
         });
     });
 
+    // Detect trigger type and build triggerSettings from trigger nodes
+    let triggerType = 'Scanner';
+    let triggerSettings = null;
+
+    for (const node of nodes) {
+        if (node.type === 'ScheduleTrigger') {
+            triggerType = 'Schedule';
+            triggerSettings = {
+                cronExpression: node.settings?.cronExpression || '',
+                schedulePayload: node.settings?.schedulePayload || ''
+            };
+            break;
+        }
+        if (node.type === 'HttpTrigger') {
+            triggerType = 'Http';
+            triggerSettings = {
+                routePath: node.settings?.routePath || '',
+                authToken: node.settings?.authToken || ''
+            };
+            break;
+        }
+        if (node.type === 'FileTrigger') {
+            triggerType = 'FileWatcher';
+            triggerSettings = {
+                watchPath: node.settings?.watchPath || '',
+                watchFilter: node.settings?.watchFilter || '',
+                watchChangeTypes: node.settings?.watchChangeTypes || ''
+            };
+            break;
+        }
+    }
+
     return {
         id: editingScenarioConfig?.id || 0,
         name: editingScenarioConfig?.name || '',
         description: editingScenarioConfig?.description || '',
         enabled: editingScenarioConfig?.enabled ?? true,
         scannerNames: editingScenarioConfig?.scannerNames || [],
+        triggerType: triggerType,
+        triggerSettings: triggerSettings,
         nodes: nodes,
         connections: connections
     };

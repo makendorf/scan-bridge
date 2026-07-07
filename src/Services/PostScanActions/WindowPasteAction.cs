@@ -121,14 +121,19 @@ public class WindowPasteAction : IPostScanAction
                 Win32Clipboard.SetForegroundWindow(prevWindow);
 
             _logger.LogInformation("Вставлено в «{Title}»: {Data}", _windowTitle, ControlCharDisplay.ForDisplay(text.TrimEnd()));
+            scan.Metadata["pasteSuccess"] = "true";
         }
         catch (OperationCanceledException)
         {
             _logger.LogDebug("Вставка отменена: {Data}", ControlCharDisplay.ForDisplay(scan.ParsedData));
+            scan.Metadata["pasteSuccess"] = "false";
+            scan.Metadata["pasteError"] = "cancelled";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка вставки в «{Title}»: {Data}", _windowTitle, ControlCharDisplay.ForDisplay(scan.ParsedData));
+            scan.Metadata["pasteSuccess"] = "false";
+            scan.Metadata["pasteError"] = ex.Message;
         }
     }
 

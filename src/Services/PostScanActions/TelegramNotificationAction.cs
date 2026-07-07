@@ -63,9 +63,14 @@ public class TelegramNotificationAction : IPostScanAction
     public async Task ExecuteAsync(ScanResult scan, CancellationToken ct)
     {
         if (_client == null || _chatIds.Count == 0)
+        {
+            scan.Metadata["telegramSuccess"] = "false";
+            scan.Metadata["telegramError"] = "no client or chat ids";
             return;
+        }
 
         var text = ScanTemplateHelper.Format(_messageTemplate, scan);
+        var anyFailed = false;
 
         foreach (var chatId in _chatIds)
         {
@@ -76,8 +81,11 @@ public class TelegramNotificationAction : IPostScanAction
             }
             catch (Exception ex)
             {
+                anyFailed = true;
+                scan.Metadata["telegramError"] = ex.Message;
                 _logger.LogError(ex, "Telegram: ошибка отправки в {ChatId}", chatId);
             }
         }
+        scan.Metadata["telegramSuccess"] = anyFailed ? "false" : "true";
     }
 }

@@ -1,0 +1,365 @@
+<div class="metadata-guide-page">
+    <div class="scenario-editor-toolbar">
+        <button class="btn btn-secondary btn-sm" onclick="history.back()">
+            <i data-lucide="arrow-left"></i> Назад
+        </button>
+        <div class="scenario-editor-title">Справочник: метаданные в сценариях</div>
+        <div></div>
+    </div>
+
+    <div class="guide-content">
+        <!-- Общие сведения -->
+        <section class="guide-section">
+            <h2>Общие сведения</h2>
+            <p>Каждый узел сценария передаёт данные дальше по графу через объект <code>ScanResult</code>. Этот объект содержит:</p>
+            <ul>
+                <li><strong>Данные скана</strong>: <code>ParsedData</code>, <code>RawData</code>, <code>Format</code>, <code>IsValid</code></li>
+                <li><strong>Метаданные</strong> (<code>metadata</code>): пары ключ-значение, которые узлы добавляют при выполнении</li>
+            </ul>
+            <p>Метаданные доступны в <strong>Condition</strong> и <strong>While</strong> узлах через поле <code>Метаданные (ключ)</code>.</p>
+        </section>
+
+        <!-- Как читать метаданные -->
+        <section class="guide-section">
+            <h2>Как читать метаданные в Condition / While</h2>
+            <ol>
+                <li>Добавьте узел <strong>Условие</strong> (Condition) или <strong>Цикл</strong> (While)</li>
+                <li>Откройте настройки (двойной клик)</li>
+                <li>Выберите <strong>Поле</strong>: <code>Метаданные (ключ)</code></li>
+                <li>В поле <strong>Значение</strong> укажите ключ метаданных (например <code>serviceSuccess</code>)</li>
+                <li>Выберите <strong>Оператор</strong>: <code>Равно</code>, <code>Не равно</code>, <code>Содержит</code></li>
+                <li>В поле <strong>Ожидаемое значение</strong> укажите ожидаемое значение</li>
+            </ol>
+            <div class="guide-tip">
+                При выборе поля «Метаданные (ключ)» появляется дополнительное поле <strong>Ожидаемое значение</strong> — именно с ним сравнивается содержимое метаданных.
+            </div>
+
+            <h3>Пример: проверка результата запуска службы</h3>
+            <table class="guide-table">
+                <thead><tr><th>Поле</th><th>Значение</th></tr></thead>
+                <tbody>
+                    <tr><td>Поле</td><td><code>Метаданные (ключ)</code></td></tr>
+                    <tr><td>Значение (ключ)</td><td><code>serviceSuccess</code></td></tr>
+                    <tr><td>Оператор</td><td><code>Равно</code></td></tr>
+                    <tr><td>Ожидаемое значение</td><td><code>true</code></td></tr>
+                </tbody>
+            </table>
+
+            <h3>Пример: проверка наличия ошибки в данных</h3>
+            <table class="guide-table">
+                <thead><tr><th>Поле</th><th>Значение</th></tr></thead>
+                <tbody>
+                    <tr><td>Поле</td><td><code>Данные (parsed)</code></td></tr>
+                    <tr><td>Оператор</td><td><code>Содержит</code></td></tr>
+                    <tr><td>Значение</td><td><code>error</code></td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Триггерные узлы -->
+        <section class="guide-section">
+            <h2>Триггерные узлы (вход в сценарий)</h2>
+
+            <div class="guide-node">
+                <h3><i data-lucide="scan-barcode"></i> Сканер (Scanner)</h3>
+                <p>Передаёт данные от сканера штрихкодов.</p>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Формат</th><th>Метаданные</th></tr></thead>
+                    <tbody>
+                        <tr><td>Распознанные данные (текст)</td><td>Тип штрихкода: <code>EAN-13</code>, <code>QR</code>, <code>Code128</code> и т.д.</td><td>—</td></tr>
+                    </tbody>
+                </table>
+                <p class="guide-note">Доступны также через поля <code>raw</code>, <code>format</code>, <code>isValid</code> напрямую.</p>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="globe"></i> HTTP Триггер</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Формат</th><th>Метаданные</th></tr></thead>
+                    <tbody>
+                        <tr><td>Тело входящего HTTP-запроса</td><td><code>Http</code></td><td>Заголовки запроса (имя заголовка = ключ)</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="clock"></i> Расписание (Schedule)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Формат</th><th>Метаданные</th></tr></thead>
+                    <tbody>
+                        <tr><td>Payload из cron (JSON)</td><td><code>Schedule</code></td><td>—</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="file-text"></i> Файловый триггер (FileWatcher)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Формат</th><th>Метаданные</th></tr></thead>
+                    <tbody>
+                        <tr><td>Содержимое файла</td><td><code>File</code></td><td><code>filePath</code>: путь к файлу</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Узлы действий -->
+        <section class="guide-section">
+            <h2>Узлы действий</h2>
+            <p>Каждый action-узел имеет два аспекта потока данных:</p>
+            <ul>
+                <li><strong>ParsedData</strong> — основное поле данных, передаётся дальше по графу</li>
+                <li><strong>Metadata</strong> — дополнительные пары ключ-значение</li>
+            </ul>
+
+            <div class="guide-node">
+                <h3><i data-lucide="scroll-text"></i> Лог (Log)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td>—</td></tr></tbody>
+                </table>
+                <p>Записывает в системный лог. Данные проходят дальше без изменений.</p>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="replace"></i> Замена символов (Replacement)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td><strong>Заменяется</strong> если хотя бы одно правило сработало</td><td><code>replacementApplied</code>: <code>true</code> / <code>false</code></td></tr></tbody>
+                </table>
+                <div class="guide-example">
+                    <strong>Пример:</strong> отправить уведомление только если замена сработала:<br>
+                    <code>Condition: Метаданные (ключ) = replacementApplied / Равно / true</code>
+                </div>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="clipboard-paste"></i> Вставка в активное окно (ClipboardPaste)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>pasteSuccess</code>: <code>true</code> / <code>false</code>, <code>pasteError</code>: текст ошибки</td></tr></tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="app-window"></i> Вставка в выбранное окно (WindowPaste)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>pasteSuccess</code>: <code>true</code> / <code>false</code>, <code>pasteError</code>: текст ошибки</td></tr></tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="download"></i> Экспорт (Export)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>exportSuccess</code>: <code>true</code> / <code>false</code>, <code>exportFilename</code>: имя файла, <code>exportError</code>: текст ошибки</td></tr></tbody>
+                </table>
+                <div class="guide-example">
+                    <strong>Пример:</strong> отправить Telegram если экспорт не удался:<br>
+                    <code>Condition: Метаданные (ключ) = exportSuccess / Не равно / true → Telegram "Ошибка экспорта: {data}"</code>
+                </div>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="send"></i> Telegram</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>telegramSuccess</code>: <code>true</code> / <code>false</code>, <code>telegramError</code>: текст ошибки</td></tr></tbody>
+                </table>
+                <div class="guide-tip"><code>telegramSuccess = false</code> — хотя бы в один чат сообщение не доставлено.</div>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="mail"></i> Email</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>emailSuccess</code>: <code>true</code> / <code>false</code>, <code>emailError</code>: текст ошибки</td></tr></tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="database"></i> Обогащение данных (DataEnrichment)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>enriched</code>: ответ API, <code>enrichmentSuccess</code>: <code>true</code> / <code>false</code>, <code>enrichmentError</code>: текст ошибки</td></tr></tbody>
+                </table>
+                <div class="guide-example">
+                    <strong>Пример:</strong> извлечь поле из обогащённых данных:<br>
+                    <code>Condition: jsonPath / равно / status.active</code>
+                </div>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="check-circle"></i> Валидация (Validation)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>validationPassed</code>: <code>true</code> / <code>false</code></td></tr></tbody>
+                </table>
+                <p>При <code>OnFailure = skip</code> устанавливает <code>IsValid = false</code>, что пропускает замену и вставку.</p>
+                <div class="guide-example">
+                    <strong>Пример:</strong> уведомить при невалидных данных:<br>
+                    <code>Condition: Метаданные (ключ) = validationPassed / Равно / false → Telegram "Данные не прошли валидацию"</code>
+                </div>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="hard-drive"></i> Запрос к БД (DatabaseQuery)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td><strong>Заменяется</strong> результатом SQL-запроса</td><td><code>querySuccess</code>: <code>true</code> / <code>false</code>, <code>queryError</code>: текст ошибки</td></tr></tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="layers"></i> Агрегация (Aggregation)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td><strong>Заменяется</strong> на JSON/CSV-массив пакета</td><td><code>batchCount</code>: количество элементов</td></tr></tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="pause"></i> Пауза (Pause)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td>—</td></tr></tbody>
+                </table>
+                <p>Приостанавливает выполнение. Данные проходят без изменений.</p>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="power"></i> Служба (Service)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>Успех:</strong> <code>Spooler: start completed → Running</code></td><td><code>serviceSuccess</code>: <code>true</code>, <code>serviceStatus</code>: статус, <code>serviceAction</code>: действие, <code>serviceName</code>: имя</td></tr>
+                        <tr><td><strong>Ошибка:</strong> <code>error: &lt;текст исключения&gt;</code></td><td><code>serviceSuccess</code>: <code>false</code>, <code>serviceError</code>: текст ошибки</td></tr>
+                    </tbody>
+                </table>
+                <div class="guide-example">
+                    <strong>Пример полного графа мониторинга:</strong>
+                    <pre>ScheduleTrigger (* * * * *)
+  → Condition: Метаданные (ключ) = serviceSuccess / Равно / true
+    ├─ true (служба работает) → End
+    └─ false (ошибка) → Telegram "Служба остановлена"
+                       → Service: start
+                         → Condition: Метаданные (ключ) = serviceSuccess / Равно / true
+                           ├─ true → Telegram "Служба запущена" → End
+                           └─ false → Telegram "Не удалось: {data}" → End</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Логические узлы -->
+        <section class="guide-section">
+            <h2>Логические узлы</h2>
+
+            <div class="guide-node">
+                <h3><i data-lucide="git-branch"></i> Условие (Condition)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>lastCondition</code>: <code>true</code> / <code>false</code></td></tr></tbody>
+                </table>
+                <p><code>lastCondition</code> доступен в следующем Condition/While для цепочки проверок.</p>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="repeat"></i> Цикл (While)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td><code>lastCondition</code>: <code>true</code> / <code>false</code></td></tr></tbody>
+                </table>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="git-merge"></i> Ветвление (Fork)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td>—</td></tr></tbody>
+                </table>
+                <p>Направляет поток во все выходы параллельно.</p>
+            </div>
+
+            <div class="guide-node">
+                <h3><i data-lucide="square"></i> Конец (End)</h3>
+                <table class="guide-table">
+                    <thead><tr><th>ParsedData</th><th>Метаданные</th></tr></thead>
+                    <tbody><tr><td>Без изменений</td><td>—</td></tr></tbody>
+                </table>
+                <p>Терминальный узел.</p>
+            </div>
+        </section>
+
+        <!-- Condition справочник -->
+        <section class="guide-section">
+            <h2>Доступ к данным через Condition</h2>
+            <table class="guide-table">
+                <thead><tr><th>Поле в Condition</th><th>Что читает</th><th>Формат</th></tr></thead>
+                <tbody>
+                    <tr><td>Данные (parsed)</td><td><code>scan.ParsedData</code></td><td>Текст</td></tr>
+                    <tr><td>Сырые данные</td><td><code>scan.RawData</code></td><td>Текст</td></tr>
+                    <tr><td>Формат</td><td><code>scan.Format</code></td><td>Текст</td></tr>
+                    <tr><td>Имя сканера</td><td><code>scan.ScannerName</code></td><td>Текст</td></tr>
+                    <tr><td>Валиден</td><td><code>scan.IsValid</code></td><td><code>true</code> / <code>false</code></td></tr>
+                    <tr><td>Метаданные (ключ)</td><td><code>scan.Metadata[значение]</code></td><td>Текст</td></tr>
+                    <tr><td>JSON поле</td><td>Поле из JSON в <code>ParsedData</code></td><td>Текст</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Операторы -->
+        <section class="guide-section">
+            <h2>Операторы сравнения</h2>
+            <table class="guide-table">
+                <thead><tr><th>Оператор</th><th>Описание</th><th>Пример</th></tr></thead>
+                <tbody>
+                    <tr><td><code>equals</code></td><td>Точное совпадение</td><td><code>true</code>, <code>Running</code>, <code>Spooler</code></td></tr>
+                    <tr><td><code>notEquals</code></td><td>Не совпадает</td><td><code>false</code></td></tr>
+                    <tr><td><code>contains</code></td><td>Содержит подстроку</td><td><code>error</code>, <code>timeout</code></td></tr>
+                    <tr><td><code>notContains</code></td><td>Не содержит</td><td><code>error</code></td></tr>
+                    <tr><td><code>greaterThan</code></td><td>Больше (числа)</td><td><code>5</code></td></tr>
+                    <tr><td><code>lessThan</code></td><td>Меньше (числа)</td><td><code>100</code></td></tr>
+                    <tr><td><code>regex</code></td><td>Регулярное выражение</td><td><code>^\d{13}$</code></td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Плейсхолдеры -->
+        <section class="guide-section">
+            <h2>Шаблоны плейсхолдеров</h2>
+            <p>В узлах <strong>Telegram</strong> и <strong>Email</strong> доступны плейсхолдеры для подстановки данных:</p>
+            <table class="guide-table">
+                <thead><tr><th>Плейсхолдер</th><th>Значение</th></tr></thead>
+                <tbody>
+                    <tr><td><code>{data}</code></td><td>ParsedData</td></tr>
+                    <tr><td><code>{raw}</code></td><td>RawData</td></tr>
+                    <tr><td><code>{format}</code></td><td>Format</td></tr>
+                    <tr><td><code>{scanner}</code></td><td>ScannerName</td></tr>
+                    <tr><td><code>{timestamp}</code></td><td>Время сканирования</td></tr>
+                </tbody>
+            </table>
+            <p class="guide-note">Для доступа к метаданным в шаблоне — сначала сохраните значение через Condition в <code>data</code>, либо используйте <code>jsonPath</code> для извлечения из JSON.</p>
+        </section>
+    </div>
+</div>
+
+<style>
+.metadata-guide-page { padding: 0; }
+.guide-content { max-width: 900px; padding: 24px; }
+.guide-section { margin-bottom: 32px; }
+.guide-section h2 { font-size: 18px; font-weight: 600; color: var(--color-text); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
+.guide-section h3 { font-size: 14px; font-weight: 600; color: var(--color-text); margin: 16px 0 8px; display: flex; align-items: center; gap: 8px; }
+.guide-section h3 i { width: 16px; height: 16px; color: var(--color-primary-light); }
+.guide-section p { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; margin: 8px 0; }
+.guide-section ul, .guide-section ol { font-size: 13px; color: var(--color-text-secondary); line-height: 1.8; padding-left: 20px; }
+.guide-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; }
+.guide-table th { text-align: left; padding: 8px 12px; background: var(--color-surface); color: var(--color-text-dim); font-weight: 600; border-bottom: 1px solid var(--color-border); }
+.guide-table td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary); vertical-align: top; }
+.guide-table td code { font-size: 11px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 3px; padding: 1px 4px; color: var(--color-primary-light); }
+.guide-node { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px; }
+.guide-tip { background: rgba(59, 130, 246, 0.08); border-left: 3px solid var(--color-info); padding: 10px 14px; font-size: 12px; color: var(--color-text-secondary); margin: 12px 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.guide-example { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--color-text-secondary); margin: 12px 0; }
+.guide-example pre { margin: 8px 0 0; font-size: 11px; white-space: pre-wrap; color: var(--color-text); }
+.guide-note { font-size: 12px; color: var(--color-text-dim); font-style: italic; }
+</style>

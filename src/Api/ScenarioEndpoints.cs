@@ -23,7 +23,7 @@ public static class ScenarioEndpoints
             return scenario != null ? Results.Ok(scenario) : Results.NotFound();
         });
 
-        app.MapPost("/api/scenarios", (ScenarioConfig config, ScenarioService service, PostScanManager postScanManager, ScenarioExecutor executor) =>
+        app.MapPost("/api/scenarios", (ScenarioConfig config, ScenarioService service, PostScanManager postScanManager, ScenarioExecutor executor, ScheduleService scheduleService) =>
         {
             var validation = service.Validate(config);
             if (!validation.IsValid)
@@ -33,10 +33,11 @@ public static class ScenarioEndpoints
 
             var id = service.Create(config);
             postScanManager.ReloadScenarios(service, executor);
+            scheduleService.ReloadSchedules();
             return Results.Created($"/api/scenarios/{id}", new { id });
         });
 
-        app.MapPut("/api/scenarios/{id}", (int id, ScenarioConfig config, ScenarioService service, PostScanManager postScanManager, ScenarioExecutor executor) =>
+        app.MapPut("/api/scenarios/{id}", (int id, ScenarioConfig config, ScenarioService service, PostScanManager postScanManager, ScenarioExecutor executor, ScheduleService scheduleService) =>
         {
             var validation = service.Validate(config);
             if (!validation.IsValid)
@@ -48,6 +49,7 @@ public static class ScenarioEndpoints
             {
                 service.Update(id, config);
                 postScanManager.ReloadScenarios(service, executor);
+                scheduleService.ReloadSchedules();
                 return Results.Ok();
             }
             catch (InvalidOperationException ex)
@@ -56,12 +58,13 @@ public static class ScenarioEndpoints
             }
         });
 
-        app.MapDelete("/api/scenarios/{id}", (int id, ScenarioService service, PostScanManager postScanManager, ScenarioExecutor executor) =>
+        app.MapDelete("/api/scenarios/{id}", (int id, ScenarioService service, PostScanManager postScanManager, ScenarioExecutor executor, ScheduleService scheduleService) =>
         {
             try
             {
                 service.Delete(id);
                 postScanManager.ReloadScenarios(service, executor);
+                scheduleService.ReloadSchedules();
                 return Results.Ok();
             }
             catch (InvalidOperationException ex)

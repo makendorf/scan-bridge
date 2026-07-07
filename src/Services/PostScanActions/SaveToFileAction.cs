@@ -71,10 +71,14 @@ public class ExportAction : IPostScanAction
         try
         {
             await _strategy.UploadAsync(bytes, filename, ct);
+            scan.Metadata["exportSuccess"] = "true";
+            scan.Metadata["exportFilename"] = filename;
             _logger.LogInformation("Export [{Dest}]: {File}", _destination, filename);
         }
         catch (Exception ex)
         {
+            scan.Metadata["exportSuccess"] = "false";
+            scan.Metadata["exportError"] = ex.Message;
             _logger.LogError(ex, "Export [{Dest}]: ошибка", _destination);
         }
     }

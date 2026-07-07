@@ -68,6 +68,7 @@ public class SerialPortService : BackgroundService
                     _config.Name, _config.PortName, _config.BaudRate, _config.DataBits, _config.Parity, _config.StopBits);
 
                 var buffer = new byte[1024];
+                var stringBuffer = new System.Text.StringBuilder();
 
                 while (!stoppingToken.IsCancellationRequested)
                 {
@@ -76,14 +77,35 @@ public class SerialPortService : BackgroundService
                         var bytesRead = _serialPort!.Read(buffer, 0, buffer.Length);
                         if (bytesRead > 0)
                         {
-                            var raw = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
-                            var result = _parser.Parse(raw, _config.ControlCharMode);
-                            result.ScannerName = _config.Name;
+                            var chunk = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                            stringBuffer.Append(chunk);
 
-                            _logger.LogInformation("[{Scanner}] Сканирование: Исходные={Raw}, Формат={Format}, Тип={ContentType}, Валидно={Valid}",
-                                _config.Name, ControlCharDisplay.ForDisplay(result.RawData), result.Format, result.ContentType, result.IsValid);
+                            // Проверяем наличие символа-терминатора (\r, \n или \r\n)
+                            var accumulated = stringBuffer.ToString();
+                            var terminatorIndex = accumulated.IndexOfAny(new[] { '\r', '\n' });
 
-                            await _processor.ProcessAsync(result, stoppingToken);
+                            if (terminatorIndex >= 0)
+                            {
+                                // Извлечь полную строку до терминатора
+                                var rawData = accumulated.Substring(0, terminatorIndex).TrimEnd('\r', '\n');
+                                stringBuffer.Clear();
+
+                                // Убрать возможные лишние символы после терминатора
+                                var remaining = accumulated.Substring(terminatorIndex + 1).TrimStart('\r', '\n');
+                                if (remaining.Length > 0)
+                                    stringBuffer.Append(remaining);
+
+                                if (rawData.Length > 0)
+                                {
+                                    var result = _parser.Parse(rawData, _config.ControlCharMode);
+                                    result.ScannerName = _config.Name;
+
+                                    _logger.LogInformation("[{Scanner}] Сканирование: Исходные={Raw}, Формат={Format}, Тип={ContentType}, Валидно={Valid}",
+                                        _config.Name, ControlCharDisplay.ForDisplay(result.RawData), result.Format, result.ContentType, result.IsValid);
+
+                                    await _processor.ProcessAsync(result, stoppingToken);
+                                }
+                            }
                         }
                     }
                     catch (TimeoutException)

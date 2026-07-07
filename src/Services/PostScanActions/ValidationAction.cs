@@ -106,6 +106,7 @@ public class ValidationAction : IPostScanAction
 
         if (!valid)
         {
+            scan.Metadata["validationPassed"] = "false";
             if (_onFailure == "skip")
             {
                 scan.IsValid = false;
@@ -115,6 +116,10 @@ public class ValidationAction : IPostScanAction
             {
                 _logger.LogWarning("Validation: данные не прошли валидацию ({Type}), предупреждение", _validationType);
             }
+        }
+        else
+        {
+            scan.Metadata["validationPassed"] = "true";
         }
 
         await Task.CompletedTask;

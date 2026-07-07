@@ -52,6 +52,9 @@ public class PostScanActionFactory : IPostScanActionFactory
             "Pause" => new PauseAction(
                 _loggerFactory.CreateLogger<PauseAction>(),
                 settings),
+            "Service" => new ServiceAction(
+                _loggerFactory.CreateLogger<ServiceAction>(),
+                settings),
             _ => null
         };
     }

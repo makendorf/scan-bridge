@@ -122,11 +122,18 @@ public class ScenarioExecutor
         }
 
         // Собрать другие триггерные узлы
+        // Маппинг: имя узла графа → строковый тип триггера ScanResult
+        var nodeTypeToTriggerType = new Dictionary<string, string>
+        {
+            ["HttpTrigger"] = "Http",
+            ["ScheduleTrigger"] = "Schedule",
+            ["FileTrigger"] = "FileWatcher"
+        };
         foreach (var nodeConfig in scenario.Nodes.Where(n => n.Type is "HttpTrigger" or "ScheduleTrigger" or "FileTrigger"))
         {
             if (compiledNodes.TryGetValue(nodeConfig.NodeId, out var compiledNode))
             {
-                var triggerType = nodeConfig.Type;
+                var triggerType = nodeTypeToTriggerType[nodeConfig.Type];
                 var triggerKey = nodeConfig.Settings?.GetValueOrDefault("routePath")
                     ?? nodeConfig.Settings?.GetValueOrDefault("cronExpression")
                     ?? nodeConfig.Settings?.GetValueOrDefault("watchPath")

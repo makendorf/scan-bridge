@@ -81,9 +81,12 @@ public class EmailNotificationAction : IPostScanAction
             await client.DisconnectAsync(true, ct);
 
             _logger.LogInformation("Email: отправлено {Count} получателям", _toAddresses.Count);
+            scan.Metadata["emailSuccess"] = "true";
         }
         catch (Exception ex)
         {
+            scan.Metadata["emailSuccess"] = "false";
+            scan.Metadata["emailError"] = ex.Message;
             _logger.LogError(ex, "Email: ошибка отправки");
         }
     }

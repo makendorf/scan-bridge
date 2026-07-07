@@ -73,6 +73,7 @@ public class AggregationAction : IPostScanAction, IDisposable
 
         var lastScan = items[^1];
         lastScan.ParsedData = batchData;
+        lastScan.Metadata["batchCount"] = items.Count.ToString();
 
         _logger.LogInformation("Aggregation: отправлен пакет из {Count} элементов", items.Count);
     }

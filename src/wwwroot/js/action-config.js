@@ -181,6 +181,20 @@ const ACTION_TYPES = {
             { key: 'DelayMs', label: 'Задержка (мс)', type: 'number', default: '1000',
               hint: 'Время ожидания в миллисекундах (от 1 до 60000)' }
         ]
+    },
+    Service: {
+        name: 'Служба',
+        description: 'Управление Windows-службой: запуск, остановка или перезапуск. Работает только на Windows.',
+        settings: [
+            { key: 'ServiceName', label: 'Имя службы', type: 'text', default: '',
+              hint: 'Системное имя службы (не отображаемое). Например: Spooler, W3SVC, postgresql' },
+            { key: 'Action', label: 'Действие', type: 'select',
+              options: ['restart', 'stop', 'start'], default: 'restart',
+              optionLabels: { restart: 'Перезапустить', stop: 'Остановить', start: 'Запустить' },
+              hint: 'Перезапуск: сначала останавливает, затем запускает службу.' },
+            { key: 'TimeoutSeconds', label: 'Таймаут (сек)', type: 'number', default: '30',
+              hint: 'Максимальное время ожидания завершения операции. Если служба не успевает — будет ошибка.' }
+        ]
     }
 };
 

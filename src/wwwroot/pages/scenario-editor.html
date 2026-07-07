@@ -5,6 +5,9 @@
         </button>
         <div class="scenario-editor-title" id="scenarioEditorTitle">Новый сценарий</div>
         <div class="scenario-editor-actions">
+            <button class="btn btn-secondary btn-sm" onclick="openMetadataGuide()">
+                <i data-lucide="book-open"></i> Справочник
+            </button>
             <button class="btn btn-secondary btn-sm" onclick="validateScenario()">
                 <i data-lucide="check-circle"></i> Валидация
             </button>
@@ -79,6 +82,9 @@
                 <div class="palette-node palette-action" draggable="true" data-type="Pause">
                     <i data-lucide="pause"></i> Пауза
                 </div>
+                <div class="palette-node palette-action" draggable="true" data-type="Service">
+                    <i data-lucide="power"></i> Служба
+                </div>
             </div>
         </div>
         <!-- Логика -->
@@ -104,5 +110,14 @@
     </div>
     <div class="scenario-canvas-wrapper">
         <div id="scenarioDrawflow" class="drawflow"></div>
+    </div>
+    <!-- Context menu -->
+    <div id="nodeContextMenu" class="node-context-menu" style="display:none">
+        <button class="node-context-menu-item" onclick="contextMenuCopy()">
+            <i data-lucide="copy"></i> Копировать
+        </button>
+        <button class="node-context-menu-item danger" onclick="contextMenuDelete()">
+            <i data-lucide="trash-2"></i> Удалить
+        </button>
     </div>
 </div>

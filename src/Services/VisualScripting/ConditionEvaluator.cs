@@ -83,6 +83,7 @@ public class ConditionEvaluator
             return scan.IsValid;
 
         string data;
+        string compareValue = value;
 
         switch (field)
         {
@@ -119,14 +120,26 @@ public class ConditionEvaluator
                 data = Environment.GetEnvironmentVariable(value) ?? "";
                 break;
             case "processRunning":
-                data = Process.GetProcessesByName(value).Length > 0 ? "true" : "false";
-                break;
+                return op switch
+                {
+                    "equals" => Process.GetProcessesByName(value).Length > 0,
+                    "notEquals" => Process.GetProcessesByName(value).Length == 0,
+                    _ => false
+                };
             case "serviceRunning":
-                data = IsServiceRunning(value) ? "true" : "false";
-                break;
+                return op switch
+                {
+                    "equals" => IsServiceRunning(value),
+                    "notEquals" => !IsServiceRunning(value),
+                    _ => false
+                };
             case "hostAvailable":
-                data = CheckHost(value) ? "true" : "false";
-                break;
+                return op switch
+                {
+                    "equals" => CheckHost(value),
+                    "notEquals" => !CheckHost(value),
+                    _ => false
+                };
             case "diskFreeMB":
                 data = GetDiskFreeMB(value).ToString();
                 break;
@@ -134,6 +147,7 @@ public class ConditionEvaluator
             // ── Метаданные ──
             case "metadata":
                 data = scan.Metadata.TryGetValue(value, out var metaVal) ? metaVal : "";
+                compareValue = settings.GetValueOrDefault("metadataExpected", "");
                 break;
 
             // ── Обработка данных ──
@@ -155,7 +169,7 @@ public class ConditionEvaluator
                 break;
         }
 
-        return CompareValue(data, op, value);
+        return CompareValue(data, op, compareValue);
     }
 
     private static string GetScanField(string field, ScanResult scan)

@@ -67,15 +67,20 @@ public class DatabaseQueryAction : IPostScanAction
                     ? reader[0]?.ToString() ?? ""
                     : reader[_resultField]?.ToString() ?? "";
                 scan.ParsedData = value;
+                scan.Metadata["querySuccess"] = "true";
                 _logger.LogInformation("DatabaseQuery: получен результат, длина={Length}", value.Length);
             }
             else
             {
+                scan.Metadata["querySuccess"] = "false";
+                scan.Metadata["queryError"] = "no results";
                 _logger.LogWarning("DatabaseQuery: запрос не вернул результатов");
             }
         }
         catch (Exception ex)
         {
+            scan.Metadata["querySuccess"] = "false";
+            scan.Metadata["queryError"] = ex.Message;
             _logger.LogError(ex, "DatabaseQuery: ошибка выполнения запроса");
         }
     }

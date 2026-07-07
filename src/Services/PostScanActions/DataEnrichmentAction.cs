@@ -87,10 +87,13 @@ public class DataEnrichmentAction : IPostScanAction
             }
 
             scan.Metadata["enriched"] = responseText;
+            scan.Metadata["enrichmentSuccess"] = "true";
             _logger.LogInformation("DataEnrichment: обогащение выполнено, ключ 'enriched' добавлен в Metadata");
         }
         catch (Exception ex)
         {
+            scan.Metadata["enrichmentSuccess"] = "false";
+            scan.Metadata["enrichmentError"] = ex.Message;
             _logger.LogError(ex, "DataEnrichment: ошибка обогащения данных");
         }
     }

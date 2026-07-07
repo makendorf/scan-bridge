@@ -79,7 +79,12 @@ public class ReplacementAction : IPostScanAction
         if (result != original)
         {
             scan.ParsedData = result;
+            scan.Metadata["replacementApplied"] = "true";
             _logger.LogInformation("Замена: {Original} → {Result}", ControlCharDisplay.ForDisplay(original), ControlCharDisplay.ForDisplay(result));
+        }
+        else
+        {
+            scan.Metadata["replacementApplied"] = "false";
         }
 
         return Task.CompletedTask;
