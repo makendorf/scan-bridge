@@ -2,7 +2,7 @@
 ; Inno Setup 6+
 
 #define MyAppName "ScanBridge"
-#define MyAppVersion "2.0.0"
+#define MyAppVersion "2.0.1"
 #define MyAppPublisher "ScanBridge"
 #define MyAppURL "https://github.com/makendorf/scan-bridge"
 #define MyAppServiceName "ScanBridge"
@@ -56,7 +56,7 @@ Filename: "{tmp}\{#AspNetCoreRuntimeInstaller}"; Parameters: "/install /quiet /n
 ; Windows Desktop Runtime
 Filename: "{tmp}\{#WindowsDesktopRuntimeInstaller}"; Parameters: "/install /quiet /norestart"; StatusMsg: "Установка Windows Desktop Runtime {#RuntimeVersion}..."; Flags: waituntilterminated; Check: not IsWindowsDesktopRuntimeInstalled
 ; Windows Service
-Filename: "sc"; Parameters: "create {#MyAppServiceName} binPath= ""{app}\{#MyAppExeName}"" start= auto"; Tasks: installservice; Flags: runhidden
+Filename: "sc"; Parameters: "create {#MyAppServiceName} binPath= ""{app}\{#MyAppExeName}"""; Tasks: installservice; Flags: runhidden
 Filename: "sc"; Parameters: "description {#MyAppServiceName} ""Система управления сканерами штрихкодов и QR-кодов"""; Tasks: installservice; Flags: runhidden
 Filename: "sc"; Parameters: "start {#MyAppServiceName}"; Tasks: installservice; Flags: runhidden
 
