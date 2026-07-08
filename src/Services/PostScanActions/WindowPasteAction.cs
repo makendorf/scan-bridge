@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using ScanBridge.IPC;
 using ScanBridge.Models;
 using ScanBridge.Utils;
 
@@ -7,13 +8,10 @@ namespace ScanBridge.Services.PostScanActions;
 /// <summary>
 /// Действие вставки результата сканирования в выбранное окно по заголовку.
 /// Находит окно по частичному совпадению заголовка, активирует его и вставляет текст.
-/// Работает только на Windows.
+/// Работает только на Windows. При ошибке доступа — фоллбэк через tray-приложение.
 /// </summary>
 public class WindowPasteAction : IPostScanAction
 {
-    /// <summary>
-    /// Тип действия.
-    /// </summary>
     public string Type => "WindowPaste";
 
     private readonly ILogger<WindowPasteAction> _logger;
@@ -51,11 +49,6 @@ public class WindowPasteAction : IPostScanAction
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
-    /// <summary>
-    /// Создаёт экземпляр действия вставки в выбранное окно.
-    /// </summary>
-    /// <param name="logger">Логгер.</param>
-    /// <param name="settings">Параметры: WindowTitle, AppendNewline, ActivationDelay, Mode (clipboard/keyboard).</param>
     public WindowPasteAction(ILogger<WindowPasteAction> logger, Dictionary<string, string> settings)
     {
         _logger = logger;
@@ -71,11 +64,6 @@ public class WindowPasteAction : IPostScanAction
             _logger.LogWarning("WindowPaste: WindowTitle не задан, действие не будет выполняться");
     }
 
-    /// <summary>
-    /// Вставляет текст в выбранное окно.
-    /// </summary>
-    /// <param name="scan">Результат сканирования.</param>
-    /// <param name="ct">Токен отмены.</param>
     public async Task ExecuteAsync(ScanResult scan, CancellationToken ct)
     {
         if (!scan.IsValid)
@@ -87,40 +75,42 @@ public class WindowPasteAction : IPostScanAction
         if (string.IsNullOrWhiteSpace(_windowTitle))
             return;
 
+        var text = scan.ParsedData;
+        if (_appendNewline)
+            text += Environment.NewLine;
+
+        // Попытка 1: прямой вызов
         try
         {
-            var targetHwnd = FindWindowByTitle(_windowTitle);
-            if (targetHwnd == IntPtr.Zero)
-            {
-                _logger.LogWarning("WindowPaste: окно с заголовком «{Title}» не найдено", _windowTitle);
-                return;
-            }
-
-            var prevWindow = Win32Clipboard.GetForegroundWindow();
-
-            ActivateWindow(targetHwnd);
-            await Task.Delay(_activationDelay, ct);
-
-            var text = scan.ParsedData;
-            if (_appendNewline)
-                text += Environment.NewLine;
-
-            if (_mode == "keyboard")
-            {
-                Win32Clipboard.SimulateTyping(text);
-            }
-            else
-            {
-                Win32Clipboard.SetClipboardText(text);
-                await Task.Delay(50, ct);
-                Win32Clipboard.SimulatePaste();
-                await Task.Delay(50, ct);
-            }
-
-            if (prevWindow != IntPtr.Zero && prevWindow != targetHwnd)
-                Win32Clipboard.SetForegroundWindow(prevWindow);
-
+            await ExecuteDirectAsync(text, ct);
             _logger.LogInformation("Вставлено в «{Title}»: {Data}", _windowTitle, ControlCharDisplay.ForDisplay(text.TrimEnd()));
+            scan.Metadata["pasteSuccess"] = "true";
+            return;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("Вставка отменена: {Data}", ControlCharDisplay.ForDisplay(scan.ParsedData));
+            scan.Metadata["pasteSuccess"] = "false";
+            scan.Metadata["pasteError"] = "cancelled";
+            return;
+        }
+        catch (Exception ex) when (IsAccessError(ex))
+        {
+            _logger.LogDebug(ex, "Прямая вставка не удалась (session 0?), попытка через tray-приложение");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка вставки в «{Title}»: {Data}", _windowTitle, ControlCharDisplay.ForDisplay(scan.ParsedData));
+            scan.Metadata["pasteSuccess"] = "false";
+            scan.Metadata["pasteError"] = ex.Message;
+            return;
+        }
+
+        // Попытка 2: через tray-приложение (Named Pipe)
+        try
+        {
+            await ExecuteViaTrayAsync(text, ct);
+            _logger.LogInformation("Вставлено через tray-приложение в «{Title}»: {Data}", _windowTitle, ControlCharDisplay.ForDisplay(text.TrimEnd()));
             scan.Metadata["pasteSuccess"] = "true";
         }
         catch (OperationCanceledException)
@@ -129,12 +119,95 @@ public class WindowPasteAction : IPostScanAction
             scan.Metadata["pasteSuccess"] = "false";
             scan.Metadata["pasteError"] = "cancelled";
         }
-        catch (Exception ex)
+        catch (Exception fallbackEx)
         {
-            _logger.LogError(ex, "Ошибка вставки в «{Title}»: {Data}", _windowTitle, ControlCharDisplay.ForDisplay(scan.ParsedData));
+            _logger.LogError(fallbackEx, "Ошибка вставки в «{Title}» (прямая + fallback): {Data}", _windowTitle, ControlCharDisplay.ForDisplay(scan.ParsedData));
             scan.Metadata["pasteSuccess"] = "false";
-            scan.Metadata["pasteError"] = ex.Message;
+            scan.Metadata["pasteError"] = fallbackEx.Message;
         }
+    }
+
+    private async Task ExecuteDirectAsync(string text, CancellationToken ct)
+    {
+        var targetHwnd = FindWindowByTitle(_windowTitle);
+        if (targetHwnd == IntPtr.Zero)
+        {
+            _logger.LogWarning("WindowPaste: окно с заголовком «{Title}» не найдено", _windowTitle);
+            return;
+        }
+
+        var prevWindow = Win32Clipboard.GetForegroundWindow();
+
+        ActivateWindow(targetHwnd);
+        await Task.Delay(_activationDelay, ct);
+
+        if (_mode == "keyboard")
+        {
+            Win32Clipboard.SimulateTyping(text);
+        }
+        else
+        {
+            Win32Clipboard.SetClipboardText(text);
+            await Task.Delay(50, ct);
+            Win32Clipboard.SimulatePaste();
+            await Task.Delay(50, ct);
+        }
+
+        if (prevWindow != IntPtr.Zero && prevWindow != targetHwnd)
+            Win32Clipboard.SetForegroundWindow(prevWindow);
+    }
+
+    private async Task ExecuteViaTrayAsync(string text, CancellationToken ct)
+    {
+        // Найти окно через tray
+        var findResponse = await IpcPipeClient.FindWindowByTitleAsync(_windowTitle, ct);
+        if (!findResponse.Success)
+            throw new InvalidOperationException($"Tray: окно не найдено: {findResponse.Error}");
+
+        var hwnd = long.Parse(findResponse.Data);
+        if (hwnd == 0)
+        {
+            _logger.LogWarning("WindowPaste (tray): окно с заголовком «{Title}» не найдено", _windowTitle);
+            return;
+        }
+
+        // Активировать окно через tray
+        var activateResponse = await IpcPipeClient.ActivateWindowAsync(hwnd, ct);
+        if (!activateResponse.Success)
+            throw new InvalidOperationException($"Tray: не удалось активировать окно: {activateResponse.Error}");
+
+        await Task.Delay(_activationDelay, ct);
+
+        // Вставить данные через tray
+        if (_mode == "keyboard")
+        {
+            var typingResponse = await IpcPipeClient.SimulateTypingAsync(text, ct);
+            if (!typingResponse.Success)
+                throw new InvalidOperationException(typingResponse.Error);
+        }
+        else
+        {
+            var clipResponse = await IpcPipeClient.SetClipboardTextAsync(text, ct);
+            if (!clipResponse.Success)
+                throw new InvalidOperationException(clipResponse.Error);
+
+            await Task.Delay(50, ct);
+
+            var pasteResponse = await IpcPipeClient.SimulatePasteAsync(ct);
+            if (!pasteResponse.Success)
+                throw new InvalidOperationException(pasteResponse.Error);
+
+            await Task.Delay(50, ct);
+        }
+    }
+
+    private static bool IsAccessError(Exception ex)
+    {
+        var msg = ex.Message;
+        return msg.Contains("Код ошибки Windows: 5")
+            || msg.Contains("SendInput вернул 0")
+            || msg.Contains("Неверный размер структуры INPUT")
+            || (ex is InvalidOperationException && msg.Contains("SendInput"));
     }
 
     private static void ActivateWindow(IntPtr hWnd)
@@ -147,17 +220,13 @@ public class WindowPasteAction : IPostScanAction
 
         var attached = false;
         if (foregroundThreadId != currentThreadId)
-        {
             attached = AttachThreadInput(currentThreadId, foregroundThreadId, true);
-        }
 
         Win32Clipboard.SetForegroundWindow(hWnd);
         BringWindowToTop(hWnd);
 
         if (attached)
-        {
             AttachThreadInput(currentThreadId, foregroundThreadId, false);
-        }
     }
 
     private static IntPtr FindWindowByTitle(string titlePart)
@@ -178,7 +247,6 @@ public class WindowPasteAction : IPostScanAction
                 found = hWnd;
                 return false;
             }
-
             return true;
         }, IntPtr.Zero);
 

@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="src/ScanBridge.csproj" />
+  <Project Path="src/Tray/ScanBridgeTray.csproj" />
   <Project Path="tests/ScanBridge.Tests.csproj" />
 </Solution>

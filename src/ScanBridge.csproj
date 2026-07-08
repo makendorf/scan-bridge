@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Tray\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="FluentFTP" Version="54.2.0" />
     <PackageReference Include="MailKit" Version="4.*" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.*" />

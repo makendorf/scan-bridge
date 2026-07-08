@@ -7,6 +7,7 @@
 #define MyAppURL "https://github.com/makendorf/scan-bridge"
 #define MyAppServiceName "ScanBridge"
 #define MyAppExeName "ScanBridge.exe"
+#define MyAppTrayExeName "ScanBridgeTray.exe"
 #define RuntimeVersion "10.0.9"
 #define DotNetRuntimeInstaller "dotnet-runtime-10.0.9-win-x64.exe"
 #define AspNetCoreRuntimeInstaller "aspnetcore-runtime-10.0.9-win-x64.exe"
@@ -43,8 +44,13 @@ Source: "{#DotNetRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#AspNetCoreRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#WindowsDesktopRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
+[Registry]
+; Автозапуск tray-приложения при входе пользователя
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "ScanBridgeTray"; ValueData: """{app}\{#MyAppTrayExeName}"""; Flags: uninsdeletevalue
+
 [Icons]
 Name: "{group}\{#MyAppName} (Web UI)"; Filename: "http://localhost:5000"
+Name: "{group}\{#MyAppName} Tray"; Filename: "{app}\{#MyAppTrayExeName}"
 Name: "{group}\Папка приложения"; Filename: "{app}"
 Name: "{group}\Удалить {#MyAppName}"; Filename: "{uninstallexe}"
 
@@ -59,8 +65,12 @@ Filename: "{tmp}\{#WindowsDesktopRuntimeInstaller}"; Parameters: "/install /quie
 Filename: "sc"; Parameters: "create {#MyAppServiceName} binPath= ""{app}\{#MyAppExeName}"""; Tasks: installservice; Flags: runhidden
 Filename: "sc"; Parameters: "description {#MyAppServiceName} ""Система управления сканерами штрихкодов и QR-кодов"""; Tasks: installservice; Flags: runhidden
 Filename: "sc"; Parameters: "start {#MyAppServiceName}"; Tasks: installservice; Flags: runhidden
+; Tray-приложение
+Filename: "{app}\{#MyAppTrayExeName}"; Flags: nowait postinstall skipifsilent; Description: "Запустить ScanBridge Tray"
 
 [UninstallRun]
+; Остановить tray-приложение перед удалением службы
+Filename: "taskkill"; Parameters: "/F /IM {#MyAppTrayExeName}"; Flags: runhidden
 Filename: "sc"; Parameters: "stop {#MyAppServiceName}"; Flags: runhidden
 Filename: "sc"; Parameters: "delete {#MyAppServiceName}"; Flags: runhidden
 
@@ -166,6 +176,7 @@ var
 begin
   Result := True;
 
+  Exec('taskkill', '/F /IM {#MyAppTrayExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('sc', 'stop ' + '{#MyAppServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('sc', 'delete ' + '{#MyAppServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
