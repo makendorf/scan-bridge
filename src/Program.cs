@@ -14,8 +14,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.UseUrls($"http://0.0.0.0:{builder.Configuration.GetValue("Port", 5000)}");
 
+var dbPath = builder.Configuration.GetValue("Database", "scanbridge.db")!;
+if (!Path.IsPathRooted(dbPath))
+    dbPath = Path.Combine(AppContext.BaseDirectory, dbPath);
 builder.Services.AddDbContext<AppDbContext>(o =>
-    o.UseSqlite($"Data Source={builder.Configuration.GetValue("Database", "scanbridge.db")}"));
+    o.UseSqlite($"Data Source={dbPath}"));
 
 builder.Host.UseSerilog();
 
@@ -139,7 +142,7 @@ using (var scope = app.Services.CreateScope())
         Log.Warning(ex, "Не удалось получить список COM-портов");
     }
 
-    Log.Information("База данных: {Path}", Path.GetFullPath("scanbridge.db"));
+    Log.Information("База данных: {Path}", dbPath);
 }
 
 app.Run();
