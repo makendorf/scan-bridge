@@ -24,7 +24,7 @@ public class ScanHistoryServiceTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite(conn));
+            options.UseSqlServer(conn));
 
         _serviceProvider = services.BuildServiceProvider();
         _scopeFactory = _serviceProvider.GetRequiredService<IServiceScopeFactory>();

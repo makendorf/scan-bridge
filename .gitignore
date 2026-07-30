@@ -28,6 +28,7 @@ logs/
 
 ## Build artifacts
 publish/
+installer/
 
 ## Patchnotes (local only)
 patchnotes/
@@ -35,3 +36,8 @@ patchnotes/
 ## OS
 Thumbs.db
 .DS_Store
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+123.png

@@ -55,6 +55,10 @@ public class PostScanActionFactory : IPostScanActionFactory
             "Service" => new ServiceAction(
                 _loggerFactory.CreateLogger<ServiceAction>(),
                 settings),
+            "ToScenario" => new ToScenarioAction(
+                _loggerFactory.CreateLogger<ToScenarioAction>(),
+                settings,
+                _scopeFactory),
             _ => null
         };
     }

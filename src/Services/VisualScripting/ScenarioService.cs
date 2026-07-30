@@ -49,6 +49,70 @@ public class ScenarioService
     }
 
     /// <summary>
+    /// Получить все включённые сценарии, содержащие узел "Из сценария" (FromScenario).
+    /// Используется для выпадающего списка в узле "В сценарий".
+    /// </summary>
+    public List<ScenarioConfig> GetAllWithFromScenarioNode()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Найти ID сценариев, у которых есть узел FromScenario
+        var scenarioIdsWithFromNode = db.ScenarioNodes
+            .Where(n => n.Type == "FromScenario")
+            .Select(n => n.ScenarioId)
+            .Distinct()
+            .ToList();
+
+        return db.Scenarios
+            .Where(s => s.Enabled && scenarioIdsWithFromNode.Contains(s.Id))
+            .OrderBy(s => s.SortOrder)
+            .ToList()
+            .Select(s => new ScenarioConfig
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Description = s.Description,
+                Enabled = s.Enabled,
+                Nodes = new(),
+                Connections = new()
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Получить сценарии, которые ссылаются на указанный сценарий через узел "В сценарий" (ToScenario).
+    /// Используется для отображения в настройках узла "Из сценария".
+    /// </summary>
+    public List<ScenarioConfig> GetScenariosThatReference(int targetScenarioId)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Найти ID сценариев, у которых есть узел ToScenario с TargetScenarioId = targetScenarioId
+        var referencingScenarioIds = db.ScenarioNodes
+            .Where(n => n.Type == "ToScenario" && n.SettingsJson != null && n.SettingsJson.Contains($"\"TargetScenarioId\":\"{targetScenarioId}\""))
+            .Select(n => n.ScenarioId)
+            .Distinct()
+            .ToList();
+
+        return db.Scenarios
+            .Where(s => referencingScenarioIds.Contains(s.Id))
+            .OrderBy(s => s.SortOrder)
+            .ToList()
+            .Select(s => new ScenarioConfig
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Description = s.Description,
+                Enabled = s.Enabled,
+                Nodes = new(),
+                Connections = new()
+            })
+            .ToList();
+    }
+
+    /// <summary>
     /// Получить все включённые сценарии с полным графом (для выполнения).
     /// </summary>
     public List<ScenarioConfig> GetAllWithGraph()
@@ -248,12 +312,12 @@ public class ScenarioService
         }
 
         // Проверить наличие точки входа: Scanner, Start (legacy), HttpTrigger, ScheduleTrigger, FileTrigger
-        var entryTypes = new HashSet<string> { "Scanner", "Start", "HttpTrigger", "ScheduleTrigger", "FileTrigger" };
+        var entryTypes = new HashSet<string> { "Scanner", "Start", "HttpTrigger", "ScheduleTrigger", "FileTrigger", "FromScenario" };
         var hasEntryNode = config.Nodes.Any(n => entryTypes.Contains(n.Type));
         var hasEnd = config.Nodes.Any(n => n.Type == "End");
 
         if (!hasEntryNode)
-            errors.Add("Отсутствует узел-триггер (Сканер, HTTP, Расписание или Файл)");
+            errors.Add("Отсутствует узел-триггер (Сканер, HTTP, Расписание, Файл или Из сценария)");
         if (!hasEnd)
             errors.Add("Отсутствует узел End");
 

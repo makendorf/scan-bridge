@@ -50,6 +50,9 @@ function renderScenarios() {
                 <button class="btn btn-primary btn-sm" onclick="editScenario(${s.id})">
                     <i data-lucide="pencil"></i> Редактировать
                 </button>
+                <button class="btn btn-secondary btn-sm" onclick="copyScenario(${s.id})">
+                    <i data-lucide="copy"></i> Копировать
+                </button>
                 <button class="btn btn-danger btn-sm" onclick="deleteScenario(${s.id}, '${escapeHtml(s.name)}')">
                     <i data-lucide="trash-2"></i> Удалить
                 </button>
@@ -67,12 +70,32 @@ function showCreateScenario() {
 }
 
 /* ── Edit Scenario ── */
-let editingScenarioData = null;
-
 async function editScenario(id) {
     editingScenarioId = id;
     location.hash = 'scenario-editor?id=' + id;
     Router.navigate('scenario-editor');
+}
+
+/* ── Copy Scenario ── */
+async function copyScenario(id) {
+    try {
+        const scenario = await Api.get(`/api/scenarios/${id}`);
+        // Create a copy without ID (will be created as new on save)
+        const copy = {
+            id: 0,
+            name: scenario.name + ' (Copy)',
+            description: scenario.description || '',
+            enabled: true,
+            scannerNames: scenario.scannerNames || [],
+            triggerType: scenario.triggerType,
+            triggerSettings: scenario.triggerSettings,
+            nodes: scenario.nodes,
+            connections: scenario.connections
+        };
+        // Store in sessionStorage for the editor to pick up
+        sessionStorage.setItem('scenarioCopy', JSON.stringify(copy));
+        navigateTo('scenario-editor');
+    } catch (e) { handleApiError(e, 'Копирование сценария'); }
 }
 
 /* ── Delete Scenario ── */

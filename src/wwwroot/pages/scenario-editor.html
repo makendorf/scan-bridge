@@ -3,7 +3,9 @@
         <button class="btn btn-secondary btn-sm" onclick="navigateTo('scenarios')">
             <i data-lucide="arrow-left"></i> Назад
         </button>
-        <div class="scenario-editor-title" id="scenarioEditorTitle">Новый сценарий</div>
+        <div class="scenario-editor-title" id="scenarioEditorTitle" onclick="openScenarioInfoModal()" style="cursor:pointer" title="Нажмите для редактирования имени и описания">
+            Новый сценарий <i data-lucide="pencil" style="width:12px;height:12px;opacity:0.5"></i>
+        </div>
         <div class="scenario-editor-actions">
             <button class="btn btn-secondary btn-sm" onclick="openMetadataGuide()">
                 <i data-lucide="book-open"></i> Справочник
@@ -34,6 +36,9 @@
                 </div>
                 <div class="palette-node palette-trigger" draggable="true" data-type="FileTrigger">
                     <i data-lucide="file-text"></i> Файл
+                </div>
+                <div class="palette-node palette-trigger" draggable="true" data-type="FromScenario">
+                    <i data-lucide="git-branch"></i> Из сценария
                 </div>
                 <div class="palette-node palette-legacy" draggable="true" data-type="Start" title="Legacy — используйте Сканер">
                     <i data-lucide="play"></i> Старт
@@ -84,6 +89,9 @@
                 </div>
                 <div class="palette-node palette-action" draggable="true" data-type="Service">
                     <i data-lucide="power"></i> Служба
+                </div>
+                <div class="palette-node palette-action" draggable="true" data-type="ToScenario">
+                    <i data-lucide="play-circle"></i> В сценарий
                 </div>
             </div>
         </div>

@@ -19,7 +19,7 @@ public class CollectorSinkTests : IDisposable
     {
         _dbPath = Path.Combine(Path.GetTempPath(), $"test_sink_{Guid.NewGuid():N}.db");
         var services = new ServiceCollection();
-        services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={_dbPath}"));
+        services.AddDbContext<AppDbContext>(o => o.UseSqlServer($"Data Source={_dbPath}"));
         services.AddSingleton<LogCollector>();
         _provider = services.BuildServiceProvider();
 

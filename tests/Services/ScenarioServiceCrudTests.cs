@@ -23,7 +23,7 @@ public class ScenarioServiceCrudTests : IDisposable
         conn.Open();
 
         var services = new ServiceCollection();
-        services.AddDbContext<AppDbContext>(options => options.UseSqlite(conn));
+        services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn));
         services.AddSingleton(Mock.Of<ILogger<ScenarioService>>());
 
         _serviceProvider = services.BuildServiceProvider();

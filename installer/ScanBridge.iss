@@ -2,7 +2,7 @@
 ; Inno Setup 6+
 
 #define MyAppName "ScanBridge"
-#define MyAppVersion "2.0.1"
+#define MyAppVersion "2.0.4"
 #define MyAppPublisher "ScanBridge"
 #define MyAppURL "https://github.com/makendorf/scan-bridge"
 #define MyAppServiceName "ScanBridge"
@@ -39,7 +39,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "installservice"; Description: "Установить как Windows Service"; GroupDescription: "Дополнительно:"; Flags: checkedonce
 
 [Files]
-Source: "C:\Users\Makendorf\Documents\Project\ScanBridge\src\bin\Release\net10.0\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "D:\Project\ScanBridge\src\bin\Release\net10.0\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#DotNetRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#AspNetCoreRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#WindowsDesktopRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -49,7 +49,7 @@ Source: "{#WindowsDesktopRuntimeInstaller}"; DestDir: "{tmp}"; Flags: deleteafte
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "ScanBridgeTray"; ValueData: """{app}\{#MyAppTrayExeName}"""; Flags: uninsdeletevalue
 
 [Icons]
-Name: "{group}\{#MyAppName} (Web UI)"; Filename: "http://localhost:5000"
+Name: "{group}\{#MyAppName} (Web UI)"; Filename: "http://localhost:2305"
 Name: "{group}\{#MyAppName} Tray"; Filename: "{app}\{#MyAppTrayExeName}"
 Name: "{group}\Папка приложения"; Filename: "{app}"
 Name: "{group}\Удалить {#MyAppName}"; Filename: "{uninstallexe}"

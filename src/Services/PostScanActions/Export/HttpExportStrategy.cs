@@ -31,6 +31,11 @@ public class HttpExportStrategy : IExportStrategy
 
         var content = System.Text.Encoding.UTF8.GetString(data);
 
+        _logger.LogInformation("Export HTTP → {Url}", _url);
+        foreach (var header in _headers)
+            _logger.LogInformation("Export HTTP Header: {Key}: {Value}", header.Key, header.Value);
+        _logger.LogInformation("Export HTTP Body:\n{Content}", content);
+
         using var request = new HttpRequestMessage(HttpMethod.Post, _url);
         foreach (var header in _headers)
         {

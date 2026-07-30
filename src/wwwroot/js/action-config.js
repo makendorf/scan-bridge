@@ -41,19 +41,21 @@ const ACTION_TYPES = {
         name: 'Экспорт',
         description: 'Сохраняет результат сканирования в файл (локально, FTP, SFTP) или отправляет на HTTP-эндпоинт. Поддерживает форматы JSON и XML.',
         settings: [
-            { key: 'Destination', label: 'Назначение', type: 'select', options: ['folder', 'ftp', 'sftp', 'http'], default: 'folder',
-              optionLabels: { folder: 'Локальная папка', ftp: 'FTP-сервер', sftp: 'SFTP-сервер', http: 'HTTP POST' } },
+            { key: 'Destination', label: 'Назначение', type: 'select', options: ['folder', 'ftp', 'sftp', 'http', 'http-get'], default: 'folder',
+              optionLabels: { folder: 'Локальная папка', ftp: 'FTP-сервер', sftp: 'SFTP-сервер', http: 'HTTP POST', 'http-get': 'HTTP GET' } },
             { key: 'FolderPath', label: 'Папка для файлов', type: 'text', default: 'C:\\Output', showWhen: 'Destination=folder' },
             { key: 'CredentialId', label: 'Учётные данные', type: 'credential', showWhen: 'Destination=ftp|sftp' },
             { key: 'FtpRemotePath', label: 'Удалённая папка', type: 'text', default: '/', showWhen: 'Destination=ftp|sftp' },
-            { key: 'HttpUrl', label: 'URL API', type: 'text', default: 'http://localhost/api/scan', showWhen: 'Destination=http',
-              hint: 'Полный URL эндпоинта для POST-запроса' },
+            { key: 'HttpUrl', label: 'URL API', type: 'text', default: 'http://localhost/api/scan', showWhen: 'Destination=http|http-get',
+              hint: 'Полный URL эндпоинта. Для GET — теги добавляются как параметры URL' },
             { key: 'HttpContentType', label: 'Content-Type', type: 'text', default: '', showWhen: 'Destination=http',
               hint: 'Оставьте пустым для автопределения (application/json или application/xml)' },
-            { key: 'HttpHeaders', label: 'Заголовки (JSON)', type: 'text', default: '{}', showWhen: 'Destination=http',
+            { key: 'HttpHeaders', label: 'Заголовки (JSON)', type: 'textarea', default: '{}', showWhen: 'Destination=http',
               hint: 'Дополнительные заголовки в формате JSON:\n{"Authorization": "Bearer token", "X-Custom": "value"}' },
-            { key: 'Format', label: 'Формат', type: 'select', options: ['json', 'xml'], default: 'json' },
-            { key: 'FilenameTemplate', label: 'Шаблон имени файла', type: 'text', default: '{timestamp}_{scanner}_{data}',
+            { key: 'Format', label: 'Формат', type: 'select', options: ['json', 'xml'], default: 'json', showWhen: 'Destination=folder|ftp|sftp|http' },
+            { key: 'RootKey', label: 'Ключ массива', type: 'text', default: '', showWhen: 'Destination=http',
+              hint: 'Если заполнено, тело запроса будет: {"Ключ": [{теги}]}\nНапример: "Orders" → {"Orders": [{"orderId":"...","lineId":"..."}]}\nПусто = плоский объект {"tag":"value"}' },
+            { key: 'FilenameTemplate', label: 'Шаблон имени файла', type: 'text', default: '{timestamp}_{scanner}_{data}', showWhen: 'Destination=folder|ftp|sftp|http',
               hint: '{timestamp} — дата/время (yyyyMMdd_HHmmss_fff)\n{scanner} — имя сканера\n{data} — распознанные данные\n{format} — формат штрихкода' },
             { key: 'Tags', label: 'Теги в файле', type: 'tags' }
         ]
@@ -195,6 +197,14 @@ const ACTION_TYPES = {
             { key: 'TimeoutSeconds', label: 'Таймаут (сек)', type: 'number', default: '30',
               hint: 'Максимальное время ожидания завершения операции. Если служба не успевает — будет ошибка.' }
         ]
+    },
+    ToScenario: {
+        name: 'В сценарий',
+        description: 'Вызывает другой сценарий, передавая текущие данные и метаданные. Результат выполнения доступен в метаданных: scenario_result_data, scenario_result_format и др.',
+        settings: [
+            { key: 'TargetScenarioId', label: 'Целевой сценарий', type: 'select', options: [],
+              hint: 'ID сценария для вызова. Данные и метаданные будут переданы на вход.' }
+        ]
     }
 };
 
@@ -259,6 +269,9 @@ function updateActionSettings(type, existing, containerId) {
             return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}</label><select class="set-field" data-key="${s.key}" onchange="onSettingChange()">${opts}</select></div>`;
         }
         const hint = s.hint ? `<span class="hint-trigger"><i data-lucide="help-circle"></i><div class="hint-popup">${esc(s.hint)}</div></span>` : '';
+        if (s.type === 'textarea') {
+            return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}${hint}</label><textarea class="set-field" data-key="${s.key}" rows="3" style="width:100%;font-family:monospace;font-size:12px">${esc(val)}</textarea></div>`;
+        }
         return `<div class="form-group" data-showwhen="${s.showWhen || ''}"><label>${s.label}${hint}</label><input class="set-field" data-key="${s.key}" type="${s.type}" value="${esc(val)}"></div>`;
     }).join('');
     renderReplacements();

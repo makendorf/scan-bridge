@@ -14,7 +14,7 @@ public abstract class IntegrationTestBase : IDisposable
     {
         var services = new ServiceCollection();
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite("DataSource=:memory:"));
+            options.UseSqlServer("DataSource=:memory:"));
 
         _rootProvider = services.BuildServiceProvider();
         ServiceProvider = _rootProvider;

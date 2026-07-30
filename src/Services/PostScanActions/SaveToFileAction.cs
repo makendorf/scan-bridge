@@ -23,6 +23,7 @@ public class ExportAction : IPostScanAction
     private readonly string _filenameTemplate;
     private readonly List<TagConfig> _tags = new();
     private readonly string _destination;
+    private readonly string _rootKey;
 
     public ExportAction(ILogger<ExportAction> logger, Dictionary<string, string> settings, IServiceScopeFactory? scopeFactory = null)
     {
@@ -33,6 +34,7 @@ public class ExportAction : IPostScanAction
             ? tpl : "{timestamp}_{scanner}_{data}";
 
         _destination = settings.TryGetValue("Destination", out var dest) ? dest.ToLowerInvariant() : "folder";
+        _rootKey = settings.TryGetValue("RootKey", out var rk) ? rk ?? "" : "";
 
         _strategy = CreateStrategy(settings, logger, scopeFactory);
 
@@ -63,8 +65,21 @@ public class ExportAction : IPostScanAction
 
     public async Task ExecuteAsync(ScanResult scan, CancellationToken ct)
     {
-        var content = _format == "xml" ? BuildXml(scan) : BuildJson(scan);
-        var ext = _format == "xml" ? "xml" : "json";
+        string content;
+        string ext;
+
+        if (_destination == "http-get")
+        {
+            // Для GET: теги формируют параметры URL, а не JSON
+            content = BuildQueryString(scan);
+            ext = "txt";
+        }
+        else
+        {
+            content = _format == "xml" ? BuildXml(scan) : BuildJson(scan);
+            ext = _format == "xml" ? "xml" : "json";
+        }
+
         var filename = MakeFilename(scan) + "." + ext;
         var bytes = Encoding.UTF8.GetBytes(content);
 
@@ -92,6 +107,10 @@ public class ExportAction : IPostScanAction
             "http" => new HttpExportStrategy(
                 Get(settings, "HttpUrl"),
                 Get(settings, "HttpContentType", _format == "xml" ? "application/xml" : "application/json"),
+                ParseHeaders(settings, logger),
+                logger),
+            "http-get" => new HttpGetExportStrategy(
+                Get(settings, "HttpUrl"),
                 ParseHeaders(settings, logger),
                 logger),
             _ => new FolderExportStrategy(Get(settings, "FolderPath"), logger)
@@ -170,6 +189,13 @@ public class ExportAction : IPostScanAction
         var dict = new Dictionary<string, object>();
         foreach (var tag in _tags)
             dict[tag.Key] = ResolveValue(tag, scan);
+
+        if (!string.IsNullOrEmpty(_rootKey))
+        {
+            var wrapper = new Dictionary<string, object> { [_rootKey] = new[] { dict } };
+            return JsonSerializer.Serialize(wrapper, new JsonSerializerOptions { WriteIndented = true });
+        }
+
         return JsonSerializer.Serialize(dict, new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -184,6 +210,24 @@ public class ExportAction : IPostScanAction
             : doc.ToString();
     }
 
+    private string BuildQueryString(ScanResult scan)
+    {
+        var parts = new List<string>();
+        foreach (var tag in _tags)
+        {
+            var value = ResolveValue(tag, scan);
+            var strValue = value switch
+            {
+                bool b => b.ToString().ToLower(),
+                double d => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                int i => i.ToString(),
+                _ => value?.ToString() ?? string.Empty
+            };
+            parts.Add($"{Uri.EscapeDataString(tag.Key)}={Uri.EscapeDataString(strValue)}");
+        }
+        return string.Join("&", parts);
+    }
+
     private static object ResolveValue(TagConfig tag, ScanResult scan)
     {
         return tag.Source switch
@@ -196,7 +240,7 @@ public class ExportAction : IPostScanAction
             "IsValid" => scan.IsValid,
             "ContentType" => scan.ContentType,
             "ParsedContent" => scan.ParsedContent ?? string.Empty,
-            "Custom" => tag.Value ?? string.Empty,
+            "Custom" => TryParseBool(tag.Value, out var b) ? b : (object)(tag.Value ?? string.Empty),
             _ => string.Empty
         };
     }
@@ -217,6 +261,18 @@ public class ExportAction : IPostScanAction
         foreach (var c in value)
             sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
         return sb.ToString();
+    }
+
+    private static bool TryParseBool(string? value, out bool result)
+    {
+        result = false;
+        if (string.IsNullOrEmpty(value)) return false;
+        if (bool.TryParse(value, out result)) return true;
+        // Also handle common variations
+        var trimmed = value.Trim();
+        if (trimmed.Equals("true", StringComparison.OrdinalIgnoreCase)) { result = true; return true; }
+        if (trimmed.Equals("false", StringComparison.OrdinalIgnoreCase)) { result = false; return true; }
+        return false;
     }
 
     public class TagConfig

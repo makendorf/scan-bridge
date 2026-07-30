@@ -12,7 +12,7 @@ public class ScenarioExecutor
     private readonly ILogger<ScenarioExecutor> _logger;
     private readonly ConditionEvaluator _conditionEvaluator;
 
-    private static readonly HashSet<string> StructuralTypes = new() { "Start", "Scanner", "HttpTrigger", "ScheduleTrigger", "FileTrigger", "Condition", "End", "Fork", "While" };
+    private static readonly HashSet<string> StructuralTypes = new() { "Start", "Scanner", "HttpTrigger", "ScheduleTrigger", "FileTrigger", "FromScenario", "Condition", "End", "Fork", "While" };
 
     public ScenarioExecutor(IPostScanActionFactory factory, ILogger<ScenarioExecutor> logger, ConditionEvaluator conditionEvaluator)
     {
@@ -37,11 +37,12 @@ public class ScenarioExecutor
         var httpTriggerConfigs = scenario.Nodes.Where(n => n.Type == "HttpTrigger").ToList();
         var scheduleTriggerConfigs = scenario.Nodes.Where(n => n.Type == "ScheduleTrigger").ToList();
         var fileTriggerConfigs = scenario.Nodes.Where(n => n.Type == "FileTrigger").ToList();
+        var fromScenarioConfigs = scenario.Nodes.Where(n => n.Type == "FromScenario").ToList();
         var startNodeConfigs = scenario.Nodes.Where(n => n.Type == "Start").ToList();
 
         // Если есть триггерные узлы — используем их
         // Если только Start — мигрируем в Scanner с пустым именем (все сканеры)
-        var allTriggers = scannerNodeConfigs.Concat(httpTriggerConfigs).Concat(scheduleTriggerConfigs).Concat(fileTriggerConfigs).ToList();
+        var allTriggers = scannerNodeConfigs.Concat(httpTriggerConfigs).Concat(scheduleTriggerConfigs).Concat(fileTriggerConfigs).Concat(fromScenarioConfigs).ToList();
         if (allTriggers.Count == 0 && startNodeConfigs.Count == 0)
         {
             _logger.LogWarning("Сценарий «{Name}» не содержит узлов-триггеров", scenario.Name);
@@ -49,7 +50,7 @@ public class ScenarioExecutor
         }
 
         // Если только Start (legacy) — создаём виртуальные Scanner узлы
-        if (scannerNodeConfigs.Count == 0)
+        if (scannerNodeConfigs.Count == 0 && fromScenarioConfigs.Count == 0)
         {
             scannerNodeConfigs = startNodeConfigs.Select(s => new ScenarioNodeConfig
             {
@@ -121,6 +122,18 @@ public class ScenarioExecutor
             }
         }
 
+        // Собрать FromScenario узлы
+        var fromScenarioNodes = new List<(int ScenarioId, CompiledNode Node)>();
+        foreach (var fsConfig in fromScenarioConfigs)
+        {
+            if (compiledNodes.TryGetValue(fsConfig.NodeId, out var compiledFsNode))
+            {
+                var callingScenarioId = scenario.Id;
+                fromScenarioNodes.Add((callingScenarioId, compiledFsNode));
+                triggerNodes.Add(("Scenario", callingScenarioId.ToString(), compiledFsNode));
+            }
+        }
+
         // Собрать другие триггерные узлы
         // Маппинг: имя узла графа → строковый тип триггера ScanResult
         var nodeTypeToTriggerType = new Dictionary<string, string>
@@ -142,13 +155,15 @@ public class ScenarioExecutor
             }
         }
 
-        var startNode = scannerNodes.Count > 0 ? scannerNodes[0].Node : compiledNodes.Values.First();
-        return new CompiledScenario(scenario, startNode, scannerNodes, triggerNodes, compiledNodes);
+        var startNode = scannerNodes.Count > 0
+            ? scannerNodes[0].Node
+            : (fromScenarioNodes.Count > 0 ? fromScenarioNodes[0].Node : compiledNodes.Values.First());
+        return new CompiledScenario(scenario, startNode, scannerNodes, triggerNodes, fromScenarioNodes, compiledNodes);
     }
 
     /// <summary>
     /// Выполняет скомпилированный сценарий для результата сканирования.
-    /// Находит Scanner узлы, совпадающие с именем сканера, и выполняет их.
+    /// Находит подходящие триггерные узлы и выполняет их.
     /// </summary>
     public async Task ExecuteAsync(CompiledScenario compiled, ScanResult scan, CancellationToken ct)
     {
@@ -158,14 +173,44 @@ public class ScenarioExecutor
             CancellationToken = ct
         };
 
-        var triggerType = scan.TriggerType;
+        await ExecuteCoreAsync(compiled, context);
+    }
+
+    /// <summary>
+    /// Выполняет сценарий и возвращает результат из узла End.
+    /// Используется для вызова сценариев из других сценариев (ToScenario).
+    /// </summary>
+    public async Task<ScanResult?> ExecuteWithResultAsync(CompiledScenario compiled, ScanResult scan, CancellationToken ct, int callDepth = 0)
+    {
+        if (callDepth > 10)
+        {
+            _logger.LogWarning("Превышена максимальная глубина вложенности сценариев (10). Сценарий: «{Name}»", compiled.Config.Name);
+            scan.Metadata["scenario_error"] = "max_depth_exceeded";
+            return null;
+        }
+
+        var context = new ScenarioContext
+        {
+            Scan = scan,
+            CancellationToken = ct,
+            CallDepth = callDepth
+        };
+
+        var result = await ExecuteCoreAsync(compiled, context);
+        return result;
+    }
+
+    private async Task<ScanResult?> ExecuteCoreAsync(CompiledScenario compiled, ScenarioContext context)
+    {
+        var triggerType = context.Scan.TriggerType;
         var triggerKey = triggerType switch
         {
-            "Scanner" => scan.ScannerName,
-            "Http" => scan.TriggerSource,
-            "Schedule" => scan.TriggerSource,
-            "FileWatcher" => scan.TriggerSource,
-            _ => scan.ScannerName
+            "Scanner" => context.Scan.ScannerName,
+            "Http" => context.Scan.TriggerSource,
+            "Schedule" => context.Scan.TriggerSource,
+            "FileWatcher" => context.Scan.TriggerSource,
+            "Scenario" => context.Scan.TriggerSource,
+            _ => context.Scan.ScannerName
         };
 
         // Найти триггерные узлы, совпадающие с типом и ключом
@@ -178,7 +223,7 @@ public class ScenarioExecutor
         {
             matchingEntries = compiled.ScannerNodes
                 .Where(s => string.IsNullOrEmpty(s.ScannerName) ||
-                            string.Equals(s.ScannerName, scan.ScannerName, StringComparison.Ordinal))
+                            string.Equals(s.ScannerName, context.Scan.ScannerName, StringComparison.Ordinal))
                 .Select(s => ("Scanner", s.ScannerName, s.Node))
                 .ToList();
 
@@ -190,10 +235,15 @@ public class ScenarioExecutor
             }
         }
 
+        ScanResult? endResult = null;
         foreach (var (_, _, node) in matchingEntries)
         {
-            await ExecuteNodeAsync(node, context);
+            var nodeResult = await ExecuteNodeAsync(node, context);
+            if (nodeResult != null)
+                endResult = nodeResult;
         }
+
+        return endResult;
     }
 
     private static bool MatchesTriggerNode((string TriggerType, string TriggerKey, CompiledNode Node) entry, string triggerType, string triggerKey)
@@ -207,6 +257,12 @@ public class ScenarioExecutor
                    string.Equals(entry.TriggerKey, triggerKey, StringComparison.Ordinal);
         }
 
+        // Scenario: match by scenario ID
+        if (triggerType == "Scenario")
+        {
+            return string.Equals(entry.TriggerKey, triggerKey, StringComparison.Ordinal);
+        }
+
         // HTTP: match by route path
         if (triggerType == "Http")
         {
@@ -217,7 +273,7 @@ public class ScenarioExecutor
         return true;
     }
 
-    private async Task ExecuteNodeAsync(CompiledNode node, ScenarioContext context)
+    private async Task<ScanResult?> ExecuteNodeAsync(CompiledNode node, ScenarioContext context)
     {
         context.CancellationToken.ThrowIfCancellationRequested();
 
@@ -230,6 +286,7 @@ public class ScenarioExecutor
                 case "HttpTrigger":
                 case "ScheduleTrigger":
                 case "FileTrigger":
+                case "FromScenario":
                     // Pass-through: триггерные узлы — точки входа, ничего не делаем
                     break;
 
@@ -248,7 +305,7 @@ public class ScenarioExecutor
                     break;
 
                 case "End":
-                    return;
+                    return context.Scan;
 
                 default:
                     // Все action типы: Log, Replacement, ClipboardPaste и т.д.
@@ -283,9 +340,12 @@ public class ScenarioExecutor
             }
 
             // Выполнить следующие узлы
+            ScanResult? endResult = null;
             foreach (var next in nextNodes)
             {
-                await ExecuteNodeAsync(next, context);
+                var nextResult = await ExecuteNodeAsync(next, context);
+                if (nextResult != null)
+                    endResult = nextResult;
             }
 
             // Для While: если условие истинно, вернуться к телу цикла
@@ -303,12 +363,16 @@ public class ScenarioExecutor
                             context.Variables[whileKey] = iterations + 1;
                             foreach (var loopNode in loopNodes)
                             {
-                                await ExecuteNodeAsync(loopNode, context);
+                                var loopResult = await ExecuteNodeAsync(loopNode, context);
+                                if (loopResult != null)
+                                    endResult = loopResult;
                             }
                         }
                     }
                 }
             }
+
+            return endResult;
         }
         catch (OperationCanceledException)
         {
@@ -317,10 +381,14 @@ public class ScenarioExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex, "Ошибка в узле {NodeId} ({Type})", node.Config.NodeId, node.Config.Type);
+            ScanResult? endResult = null;
             foreach (var next in node.NextNodes)
             {
-                await ExecuteNodeAsync(next, context);
+                var nextResult = await ExecuteNodeAsync(next, context);
+                if (nextResult != null)
+                    endResult = nextResult;
             }
+            return endResult;
         }
     }
 
@@ -372,4 +440,5 @@ public class ScenarioContext
     public ScanResult Scan { get; set; } = new();
     public Dictionary<string, object> Variables { get; set; } = new();
     public CancellationToken CancellationToken { get; set; }
+    public int CallDepth { get; set; }
 }

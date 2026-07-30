@@ -3,6 +3,8 @@
 let drawflowEditor = null;
 let selectedNodeId = null;
 let editingScenarioConfig = null;
+let _callableScenarios = null; // cached list of scenarios with FromScenario node
+let _editorInitializing = false;
 
 // Action type → icon mapping
 const ACTION_ICONS = {
@@ -19,6 +21,7 @@ const ACTION_ICONS = {
     DatabaseQuery: 'hard-drive',
     Pause: 'pause',
     Service: 'power',
+    ToScenario: 'play-circle',
 };
 
 // Metadata that each node type passes downstream
@@ -111,6 +114,19 @@ const NODE_METADATA = {
         { key: 'data', desc: 'Без изменений → ParsedData' },
         { key: 'lastCondition', desc: 'true/false — результат условия' },
     ],
+    FromScenario: [
+        { key: 'data', desc: 'Данные из вызывающего сценария → ParsedData' },
+        { key: 'raw', desc: 'Исходные данные → RawData' },
+        { key: 'format', desc: 'Формат → Format' },
+        { key: 'metadata', desc: 'Все метаданные из вызывающего сценария' },
+    ],
+    ToScenario: [
+        { key: 'data', desc: 'Без изменений → ParsedData' },
+        { key: 'scenario_result_data', desc: 'Результат из End дочернего сценария' },
+        { key: 'scenario_result_format', desc: 'Формат результата' },
+        { key: 'scenario_result_valid', desc: 'Валидность результата' },
+        { key: 'scenario_error', desc: 'Ошибка вызова (если есть)' },
+    ],
 };
 
 // Generate templates for each action type
@@ -182,6 +198,10 @@ const VS_NODE_TEMPLATES = {
         <div class="vs-node vs-node-end">
             <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="square"></i></span> Конец</div>
         </div>`,
+    FromScenario: () => `
+        <div class="vs-node vs-node-trigger-scenario">
+            <div class="vs-node-header"><span class="vs-node-icon"><i data-lucide="git-branch"></i></span> Из сценария</div>
+        </div>`,
 };
 
 // Add action templates dynamically
@@ -192,6 +212,7 @@ Object.keys(ACTION_TYPES).forEach(key => {
 // All node types for the palette
 const PALETTE_NODE_TYPES = [
     { type: 'Scanner', label: 'Сканер', icon: 'scan-barcode' },
+    { type: 'FromScenario', label: 'Из сценария', icon: 'git-branch' },
     ...Object.keys(ACTION_TYPES).map(key => ({
         type: key,
         label: ACTION_TYPES[key].name,
@@ -270,8 +291,30 @@ document.addEventListener('click', (e) => {
 
 /* ── Initialize Editor ── */
 async function initScenarioEditor(scenario, scenarioId) {
+    // Prevent re-initialization from hashchange during async load
+    if (_editorInitializing) return;
+
+    // Check if we have a copied scenario data in sessionStorage
+    if (!scenario && !scenarioId) {
+        const copied = sessionStorage.getItem('scenarioCopy');
+        if (copied) {
+            try {
+                scenario = JSON.parse(copied);
+                sessionStorage.removeItem('scenarioCopy');
+            } catch (e) {}
+        }
+    }
+
+    _editorInitializing = true;
     editingScenarioConfig = scenario;
     NODE_COUNTER = 0;
+
+    // Pre-fetch callable scenarios for ToScenario dropdown
+    try {
+        _callableScenarios = await Api.get('/api/scenarios/callable');
+    } catch (e) {
+        _callableScenarios = [];
+    }
 
     // If scenarioId provided, fetch from API
     if (!scenario && scenarioId) {
@@ -285,7 +328,13 @@ async function initScenarioEditor(scenario, scenarioId) {
     editingScenarioConfig = scenario;
 
     const titleEl = document.getElementById('scenarioEditorTitle');
-    titleEl.textContent = scenario ? `Редактирование: ${scenario.name}` : 'Новый сценарий';
+    const titleText = scenario ? scenario.name : 'Новый сценарий';
+    titleEl.innerHTML = '';
+    titleEl.appendChild(document.createTextNode(titleText + ' '));
+    const pencil = document.createElement('i');
+    pencil.setAttribute('data-lucide', 'pencil');
+    pencil.style.cssText = 'width:12px;height:12px;opacity:0.5';
+    titleEl.appendChild(pencil);
 
     const container = document.getElementById('scenarioDrawflow');
     container.innerHTML = '';
@@ -349,7 +398,7 @@ async function initScenarioEditor(scenario, scenarioId) {
         const nodeClass = nodeData.class;
         const isAction = ACTION_TYPES.hasOwnProperty(nodeClass);
         const actionType = isAction ? nodeClass : (nodeData.data?.settings?.__actionType || null);
-        const inputCount = (nodeClass === 'Start' || nodeClass === 'Scanner' || nodeClass === 'HttpTrigger' || nodeClass === 'ScheduleTrigger' || nodeClass === 'FileTrigger') ? 0 : 1;
+        const inputCount = (nodeClass === 'Start' || nodeClass === 'Scanner' || nodeClass === 'HttpTrigger' || nodeClass === 'ScheduleTrigger' || nodeClass === 'FileTrigger' || nodeClass === 'FromScenario') ? 0 : 1;
         const outputCount = nodeClass === 'Condition' || nodeClass === 'While' ? 2 : (nodeClass === 'Fork' ? 3 : (nodeClass === 'End' ? 0 : 1));
         const template = VS_NODE_TEMPLATES[nodeClass];
         if (!template) return;
@@ -379,6 +428,7 @@ async function initScenarioEditor(scenario, scenarioId) {
 
     setupPaletteDragDrop();
     lucide.createIcons();
+    _editorInitializing = false;
 }
 
 /* ── ShowWhen Filtering ── */
@@ -388,7 +438,7 @@ function importScenarioToDrawflow(scenario) {
 
     // Add nodes
     scenario.nodes.forEach(node => {
-        const inputCount = (node.type === 'Start' || node.type === 'Scanner' || node.type === 'HttpTrigger' || node.type === 'ScheduleTrigger' || node.type === 'FileTrigger') ? 0 : 1;
+        const inputCount = (node.type === 'Start' || node.type === 'Scanner' || node.type === 'HttpTrigger' || node.type === 'ScheduleTrigger' || node.type === 'FileTrigger' || node.type === 'FromScenario') ? 0 : 1;
         const outputCount = node.type === 'Condition' || node.type === 'While' ? 2 : (node.type === 'Fork' ? 3 : (node.type === 'End' ? 0 : 1));
         const template = VS_NODE_TEMPLATES[node.type];
         if (!template) return;
@@ -447,7 +497,7 @@ function setupPaletteDragDrop() {
             const x = e.clientX - rect.left + drawflowContainer.parentElement.scrollLeft;
             const y = e.clientY - rect.top + drawflowContainer.parentElement.scrollTop;
 
-            const inputCount = (type === 'Start' || type === 'Scanner' || type === 'HttpTrigger' || type === 'ScheduleTrigger' || type === 'FileTrigger') ? 0 : 1;
+            const inputCount = (type === 'Start' || type === 'Scanner' || type === 'HttpTrigger' || type === 'ScheduleTrigger' || type === 'FileTrigger' || type === 'FromScenario') ? 0 : 1;
             const outputCount = type === 'Condition' || type === 'While' ? 2 : (type === 'Fork' ? 3 : (type === 'End' ? 0 : 1));
 
             drawflowEditor.addNode(
@@ -517,6 +567,29 @@ function openNodeSettingsModal(id) {
         updateActionSettings(nodeClass, existing, 'nodeActionSettings');
         // Load credential dropdowns with saved values
         loadCredentialSelects(existing);
+
+        // For ToScenario: populate scenario dropdown (only scenarios with FromScenario node)
+        if (nodeClass === 'ToScenario') {
+            const select = document.querySelector('#nodeActionSettings .set-field[data-key="TargetScenarioId"]');
+            const savedId = existing.TargetScenarioId || '';
+            if (select) {
+                const scenarios = _callableScenarios || [];
+                select.innerHTML = '<option value="">Выберите сценарий</option>';
+                scenarios.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = String(s.id);
+                    opt.textContent = `${s.name} (ID: ${s.id})`;
+                    select.appendChild(opt);
+                });
+            }
+            // Restore value AFTER all init completes
+            if (savedId) {
+                setTimeout(() => {
+                    const sel = document.querySelector('#nodeActionSettings .set-field[data-key="TargetScenarioId"]');
+                    if (sel) sel.value = String(savedId);
+                }, 100);
+            }
+        }
 
     } else if (nodeClass === 'Scanner') {
         title.textContent = 'Настройки: Сканер';
@@ -686,6 +759,39 @@ function openNodeSettingsModal(id) {
             </button>
         `;
         renderWhileConditions(conditions);
+    } else if (nodeClass === 'FromScenario') {
+        title.textContent = 'Настройки: Из сценария';
+        const scenarioId = editingScenarioConfig?.id;
+        content.innerHTML = `
+            <div class="form-grid">
+                <p style="color:var(--color-text-muted);font-size:13px;margin-bottom:8px">
+                    Этот узел является точкой входа для вызова сценария из другого сценария.
+                </p>
+                <div class="form-section-title">Сценарии, которые вызывают этот сценарий</div>
+                <div id="fromScenarioRefs"><span style="color:var(--color-text-muted)">Загрузка...</span></div>
+            </div>
+        `;
+        if (scenarioId) {
+            Api.get(`/api/scenarios/${scenarioId}/referenced-by`).then(refs => {
+                const container = document.getElementById('fromScenarioRefs');
+                if (!container) return;
+                if (refs.length === 0) {
+                    container.innerHTML = '<p style="color:var(--color-text-muted);font-size:12px">Нет сценариев, ссылающихся на этот</p>';
+                } else {
+                    container.innerHTML = refs.map(r => `
+                        <div class="from-scenario-ref" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--color-bg-secondary);border-radius:6px;margin-bottom:6px;cursor:pointer" onclick="openScenarioById(${r.id})" title="Открыть сценарий">
+                            <i data-lucide="external-link" style="width:14px;height:14px;color:var(--color-primary);flex-shrink:0"></i>
+                            <span style="flex:1;font-size:13px">${escapeHtml(r.name)}</span>
+                            <span style="color:var(--color-text-muted);font-size:11px">ID: ${r.id}</span>
+                        </div>
+                    `).join('');
+                    lucide.createIcons();
+                }
+            }).catch(() => {
+                const container = document.getElementById('fromScenarioRefs');
+                if (container) container.innerHTML = '<p style="color:var(--color-danger);font-size:12px">Ошибка загрузки</p>';
+            });
+        }
     } else {
         title.textContent = `Настройки: ${nodeClass}`;
         content.innerHTML = `<p class="hint">Настройки для типа «${escapeHtml(nodeClass)}» отсутствуют</p>`;
@@ -782,9 +888,10 @@ function saveNodeSettingsFromUI(id) {
         });
     }
 
-    if (Object.keys(settings).length > 0) {
-        drawflowEditor.updateNodeDataFromId(parseInt(id), { settings });
-    }
+    // Always save, even if empty — to preserve existing data
+    const existingData = drawflowEditor.getNodeFromId(parseInt(id))?.data || {};
+    const merged = { ...existingData, settings: { ...existingData.settings, ...settings } };
+    drawflowEditor.updateNodeDataFromId(parseInt(id), merged);
 
     // Update node display
     updateScannerNodeDisplay(id, settings.scannerName);
@@ -936,6 +1043,13 @@ function collectWhileConditions() {
 /* ── Save Scenario from Editor ── */
 let pendingScenarioData = null;
 
+/* ── Open Scenario by ID ── */
+function openScenarioById(scenarioId) {
+    closeNodeSettingsModal();
+    editingScenarioConfig = null;
+    initScenarioEditor(null, scenarioId);
+}
+
 function saveScenarioFromEditor() {
     if (!drawflowEditor) return;
 
@@ -1001,6 +1115,44 @@ async function doSaveScenario(scenario) {
 
 /* ── Metadata Guide Modal ── */
 let _metadataGuideLoaded = false;
+/* ── Scenario Info Modal ── */
+function openScenarioInfoModal() {
+    const nameInput = document.getElementById('scenarioInfoName');
+    const descInput = document.getElementById('scenarioInfoDesc');
+    const enabledSelect = document.getElementById('scenarioInfoEnabled');
+    nameInput.value = editingScenarioConfig?.name || '';
+    descInput.value = editingScenarioConfig?.description || '';
+    enabledSelect.value = editingScenarioConfig?.enabled !== false ? 'true' : 'false';
+    openModal('scenarioInfoModal');
+    setTimeout(() => nameInput.focus(), 100);
+}
+
+function saveScenarioInfo() {
+    const name = document.getElementById('scenarioInfoName').value.trim();
+    if (!name) {
+        document.getElementById('scenarioInfoName').focus();
+        return;
+    }
+    if (!editingScenarioConfig) {
+        editingScenarioConfig = { name: '', description: '', enabled: true };
+    }
+    editingScenarioConfig.name = name;
+    editingScenarioConfig.description = document.getElementById('scenarioInfoDesc').value.trim();
+    editingScenarioConfig.enabled = document.getElementById('scenarioInfoEnabled').value === 'true';
+
+    // Update title
+    const titleEl = document.getElementById('scenarioEditorTitle');
+    titleEl.innerHTML = '';
+    titleEl.appendChild(document.createTextNode(name + ' '));
+    const pencil = document.createElement('i');
+    pencil.setAttribute('data-lucide', 'pencil');
+    pencil.style.cssText = 'width:12px;height:12px;opacity:0.5';
+    titleEl.appendChild(pencil);
+    lucide.createIcons();
+
+    closeModal('scenarioInfoModal');
+}
+
 async function openMetadataGuide() {
     if (!_metadataGuideLoaded) {
         try {
@@ -1083,6 +1235,10 @@ function exportDrawflowToScenario(exportData) {
             };
             break;
         }
+        if (node.type === 'FromScenario') {
+            triggerType = 'Scenario';
+            break;
+        }
     }
 
     return {
@@ -1107,9 +1263,9 @@ async function validateScenario() {
 
     // Client-side validation
     const errors = [];
-    const entryTypes = ['Start', 'Scanner', 'HttpTrigger', 'ScheduleTrigger', 'FileTrigger'];
+    const entryTypes = ['Start', 'Scanner', 'HttpTrigger', 'ScheduleTrigger', 'FileTrigger', 'FromScenario'];
     if (scenario.nodes.length === 0) errors.push('Сценарий не содержит узлов');
-    if (!scenario.nodes.some(n => entryTypes.includes(n.type))) errors.push('Отсутствует узел-триггер (Сканер, HTTP, Расписание или Файл)');
+    if (!scenario.nodes.some(n => entryTypes.includes(n.type))) errors.push('Отсутствует узел-триггер (Сканер, HTTP, Расписание, Файл или Из сценария)');
     if (!scenario.nodes.some(n => n.type === 'End')) errors.push('Отсутствует узел End');
 
     const content = document.getElementById('nodeSettingsContent');

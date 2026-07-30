@@ -158,6 +158,40 @@
         </div>
     </div>
 
+    <!-- ═══════ SCENARIO INFO MODAL ═══════ -->
+    <div class="modal-overlay" id="scenarioInfoModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Настройки сценария</h2>
+                <button class="btn-icon" onclick="closeModal('scenarioInfoModal')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>Имя сценария</label>
+                    <input id="scenarioInfoName" type="text" maxlength="200" placeholder="Название сценария">
+                </div>
+                <div class="form-group full">
+                    <label>Описание</label>
+                    <textarea id="scenarioInfoDesc" rows="3" maxlength="2000" placeholder="Описание назначения сценария (необязательно)"></textarea>
+                </div>
+                <div class="form-group full">
+                    <label>Статус</label>
+                    <select id="scenarioInfoEnabled">
+                        <option value="true">Активен</option>
+                        <option value="false">Отключён</option>
+                    </select>
+                    <small style="color:var(--color-text-muted)">Отключённый сценарий не выполняется при сканировании</small>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="closeModal('scenarioInfoModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="saveScenarioInfo()">
+                    <i data-lucide="check"></i> Применить
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══════ SCENARIO SAVE MODAL ═══════ -->
     <div class="modal-overlay" id="scenarioSaveModal">
         <div class="modal">

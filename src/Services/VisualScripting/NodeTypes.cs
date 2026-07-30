@@ -16,6 +16,7 @@ public static class NodeTypes
         ["Condition"] = new("Условие", "Ветвление по условию", ["input_1"], ["output_1", "output_2"]),
         ["While"] = new("Цикл", "Повторение тела цикла пока условие истинно", ["input_1"], ["output_1", "output_2"]),
         ["End"] = new("Конец", "Точка выхода", ["input_1"], []),
+        ["FromScenario"] = new("Из сценария", "Точка входа: вызов из другого сценария", [], ["output_1"]),
 
         // Действия
         ["Log"] = new("Логирование", "Запись данных в системный лог", ["input_1"], ["output_1"]),
@@ -30,6 +31,7 @@ public static class NodeTypes
         ["Aggregation"] = new("Агрегация", "Накопление и объединение данных", ["input_1"], ["output_1"]),
         ["DatabaseQuery"] = new("Запрос к БД", "Выполнение запроса к базе данных", ["input_1"], ["output_1"]),
         ["Pause"] = new("Пауза", "Приостановка выполнения", ["input_1"], ["output_1"]),
+        ["ToScenario"] = new("В сценарий", "Вызов другого сценария", ["input_1"], ["output_1"]),
     };
 }
 

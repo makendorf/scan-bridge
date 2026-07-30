@@ -441,9 +441,14 @@
     background: rgba(139, 92, 246, 0.15);
     color: #8B5CF6;
 }
+.vs-node-trigger-scenario .vs-node-header {
+    background: rgba(20, 184, 166, 0.15);
+    color: #14B8A6;
+}
 .vs-node-trigger-http .vs-node-body,
 .vs-node-trigger-schedule .vs-node-body,
-.vs-node-trigger-file .vs-node-body {
+.vs-node-trigger-file .vs-node-body,
+.vs-node-trigger-scenario .vs-node-body {
     text-align: center;
 }
 .vs-trigger-display {
@@ -855,4 +860,11 @@
     padding: 1px 5px;
     color: var(--color-primary-light);
     font-family: var(--font-mono, monospace);
+}
+
+/* ── FromScenario referenced-by list ── */
+.from-scenario-ref:hover {
+    background: var(--color-bg-hover) !important;
+    border-color: var(--color-primary);
+    transform: translateX(2px);
 }

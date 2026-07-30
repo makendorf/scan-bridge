@@ -1,3 +1,6 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace ScanBridge.Data.Entities;
 
 /// <summary>
@@ -9,6 +12,8 @@ public class LogRecord
     /// <summary>
     /// Уникальный идентификатор записи.
     /// </summary>
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
 
     /// <summary>

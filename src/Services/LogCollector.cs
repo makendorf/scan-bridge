@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using ScanBridge.Data;
 using ScanBridge.Data.Entities;
@@ -6,26 +7,13 @@ namespace ScanBridge.Services;
 
 public class LogCollector
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly Queue<LogRecord> _pending = new();
-    private readonly object _lock = new();
-    private AppDbContext? _db;
+    private readonly IServiceScopeFactory _scopeFactory;
+    // Используем потокобезопасную очередь вместо lock + Queue
+    private readonly ConcurrentQueue<LogRecord> _pending = new();
 
-    public LogCollector(IServiceProvider serviceProvider)
+    public LogCollector(IServiceScopeFactory scopeFactory)
     {
-        _serviceProvider = serviceProvider;
-    }
-
-    private AppDbContext GetDbContext()
-    {
-        if (_db != null) return _db;
-        lock (_lock)
-        {
-            if (_db != null) return _db;
-            var scope = _serviceProvider.CreateScope();
-            _db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            return _db;
-        }
+        _scopeFactory = scopeFactory;
     }
 
     public void Add(string level, string message, string? exception = null)
@@ -40,38 +28,49 @@ public class LogCollector
 
         try
         {
-            var db = GetDbContext();
-            LogRecord[] pending;
-            lock (_lock)
+            // КРИТИЧЕСКИ ВАЖНО: Создаем НОВЫЙ scope и НОВЫЙ DbContext для каждой операции.
+            // Это гарантирует отсутствие конфликтов потоков и чистый ChangeTracker.
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // Сначала пытаемся сохранить все накопленные ошибочные записи
+            while (_pending.TryDequeue(out var pendingRecord))
             {
-                pending = _pending.ToArray();
-                _pending.Clear();
+                db.Logs.Add(pendingRecord);
             }
-            foreach (var p in pending)
-                db.Logs.Add(p);
+
+            // Добавляем текущую запись
             db.Logs.Add(record);
             db.SaveChanges();
         }
         catch (Exception ex)
         {
-            lock (_lock) _pending.Enqueue(record);
-            System.Diagnostics.Debug.WriteLine($"LogCollector save failed: {ex.Message}");
+            // Если сохранить не удалось, кладем запись в очередь для следующей попытки
+            _pending.Enqueue(record);
+
+            // ВАЖНО: Здесь НЕЛЬЗЯ использовать ILogger или Serilog! 
+            // Это мгновенно создаст бесконечную рекурсию (StackOverflow).
+            // Оставляем Debug.WriteLine или запись в текстовый файл.
+            System.Diagnostics.Debug.WriteLine($"[LogCollector] Save failed: {ex.Message}");
         }
     }
 
     public void Clear()
     {
-        lock (_lock) { _pending.Clear(); }
-
         try
         {
-            var db = GetDbContext();
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
             db.Logs.ExecuteDelete();
             db.SaveChanges();
+
+            // Очищаем и оперативную очередь
+            while (_pending.TryDequeue(out _)) { }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"LogCollector clear failed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[LogCollector] Clear failed: {ex.Message}");
         }
     }
 }

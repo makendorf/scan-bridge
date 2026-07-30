@@ -17,6 +17,18 @@ public static class ScenarioEndpoints
             return Results.Ok(scenarios);
         });
 
+        app.MapGet("/api/scenarios/callable", (ScenarioService service) =>
+        {
+            var scenarios = service.GetAllWithFromScenarioNode();
+            return Results.Ok(scenarios);
+        });
+
+        app.MapGet("/api/scenarios/{id}/referenced-by", (int id, ScenarioService service) =>
+        {
+            var scenarios = service.GetScenariosThatReference(id);
+            return Results.Ok(scenarios);
+        });
+
         app.MapGet("/api/scenarios/{id}", (int id, ScenarioService service) =>
         {
             var scenario = service.GetById(id);

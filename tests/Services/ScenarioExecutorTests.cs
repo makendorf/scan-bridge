@@ -308,4 +308,133 @@ public class ScenarioExecutorTests
             }
         };
     }
+
+    [Fact]
+    public void Compile_WithFromScenarioNode_ReturnsSuccess()
+    {
+        var scenario = new ScenarioConfig
+        {
+            Id = 42,
+            Name = "FromScenarioTest",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "FromScenario", PositionX = 0, PositionY = 0 },
+                new() { NodeId = "2", Type = "Log", PositionX = 200, PositionY = 0 },
+                new() { NodeId = "3", Type = "End", PositionX = 400, PositionY = 0 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "2" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+            }
+        };
+        var result = _executor.Compile(scenario);
+        Assert.NotNull(result);
+        Assert.Single(result.FromScenarioNodes);
+        Assert.Equal(42, result.FromScenarioNodes[0].ScenarioId);
+    }
+
+    [Fact]
+    public async Task ExecuteFromScenario_ReceivesTriggerData()
+    {
+        var actionMock = new Mock<IPostScanAction>();
+        actionMock.Setup(a => a.Type).Returns("Log");
+        _factoryMock.Setup(f => f.Create("Log", It.IsAny<Dictionary<string, string>>()))
+            .Returns(actionMock.Object);
+
+        var scenario = new ScenarioConfig
+        {
+            Id = 42,
+            Name = "FromScenarioExec",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "FromScenario", PositionX = 0, PositionY = 0 },
+                new() { NodeId = "2", Type = "Log", PositionX = 200, PositionY = 0 },
+                new() { NodeId = "3", Type = "End", PositionX = 400, PositionY = 0 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "2" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+            }
+        };
+
+        var compiled = _executor.Compile(scenario);
+        Assert.NotNull(compiled);
+
+        var scan = new ScanResult
+        {
+            ParsedData = "FROM_PARENT",
+            TriggerType = "Scenario",
+            TriggerSource = "42",
+            IsValid = true
+        };
+
+        await _executor.ExecuteAsync(compiled, scan, CancellationToken.None);
+
+        actionMock.Verify(a => a.ExecuteAsync(
+            It.Is<ScanResult>(s => s.ParsedData == "FROM_PARENT"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecuteWithResultAsync_ReturnsEndNodeScanResult()
+    {
+        var scenario = new ScenarioConfig
+        {
+            Id = 99,
+            Name = "ChildScenario",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "" } },
+                new() { NodeId = "2", Type = "Log", PositionX = 200, PositionY = 0 },
+                new() { NodeId = "3", Type = "End", PositionX = 400, PositionY = 0 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "2" },
+                new() { SourceNodeId = "2", TargetNodeId = "3" },
+            }
+        };
+
+        var compiled = _executor.Compile(scenario);
+        Assert.NotNull(compiled);
+
+        var scan = new ScanResult { ParsedData = "CHILD_DATA", IsValid = true };
+        var result = await _executor.ExecuteWithResultAsync(compiled, scan, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("CHILD_DATA", result.ParsedData);
+    }
+
+    [Fact]
+    public async Task ExecuteWithResultAsync_ExceedsDepthLimit_ReturnsNull()
+    {
+        var scenario = new ScenarioConfig
+        {
+            Id = 1,
+            Name = "Deep",
+            Nodes = new List<ScenarioNodeConfig>
+            {
+                new() { NodeId = "1", Type = "Scanner", PositionX = 0, PositionY = 0,
+                    Settings = new Dictionary<string, string> { ["scannerName"] = "" } },
+                new() { NodeId = "2", Type = "End", PositionX = 200, PositionY = 0 },
+            },
+            Connections = new List<ScenarioConnectionConfig>
+            {
+                new() { SourceNodeId = "1", TargetNodeId = "2" },
+            }
+        };
+
+        var compiled = _executor.Compile(scenario);
+        Assert.NotNull(compiled);
+
+        var scan = new ScanResult { ParsedData = "test", IsValid = true };
+        var result = await _executor.ExecuteWithResultAsync(compiled, scan, CancellationToken.None, callDepth: 11);
+
+        Assert.Null(result);
+        Assert.True(scan.Metadata.ContainsKey("scenario_error"));
+        Assert.Equal("max_depth_exceeded", scan.Metadata["scenario_error"]);
+    }
 }

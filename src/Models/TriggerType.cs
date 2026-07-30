@@ -11,5 +11,6 @@ public enum TriggerType
     Scanner = 0,
     Http = 1,
     Schedule = 2,
-    FileWatcher = 3
+    FileWatcher = 3,
+    Scenario = 4
 }

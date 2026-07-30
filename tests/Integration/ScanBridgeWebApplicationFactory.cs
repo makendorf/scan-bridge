@@ -20,7 +20,7 @@ public class ScanBridgeWebApplicationFactory : WebApplicationFactory<Program>
 
             // Add InMemory SQLite
             services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite("DataSource=:memory:"));
+                options.UseSqlServer("DataSource=:memory:"));
         });
     }
 }
