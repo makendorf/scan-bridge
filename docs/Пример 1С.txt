@@ -1,0 +1,38 @@
+organisation = новый Структура;
+	organisation.Вставить("inn","3127007309");
+	organisation.Вставить("kpp","312701001"); 
+	
+	gtin = тек_стр.gtin;
+	
+	productSeries = новый Структура;
+	//productSeries.Вставить("lotNumber",СтрЗаменить(Строка(Формат(тек_стр.ДатаВыработки,"ДФ=dd.MM.yyyy")),".",""));     
+	productSeries.Вставить("lotNumber",gtin+СтрЗаменить(Строка(Формат(тек_стр.ДатаВыработки,"ДФ=yyMMdd")),".","")+"1");
+	productSeries.Вставить("productDate",Строка(Формат(тек_стр.ДатаВыработки,"ДФ=dd.MM.yyyy"))); 
+	productSeries.Вставить("expDate",Строка(Формат(тек_стр.ДатаВыработки + 86400*тек_стр.Номенклатура.СрокРеализацииСут,"ДФ=dd.MM.yyyy")));
+	
+	//count = Строка(Окр(тек_стр.КолвоШт,0));   
+	count = 0;
+	
+	sku = тек_стр.sku;
+	
+	type = "serialisationaggregation";  
+	
+	OrderVolumeInKg = Строка(тек_стр.КолвоКг);
+	
+	Структура = Новый Структура("organisation,equipmentTaskCreationMode,gtin,productSeries,count,type,sku,OrderVolumeInKg");
+	Структура.Вставить("organisation",organisation);
+	Структура.Вставить("gtin",gtin);
+	Структура.Вставить("equipmentTaskCreationMode","printTaskCapture");
+	Структура.Вставить("sku",sku);
+	Структура.Вставить("productSeries",productSeries);
+	Структура.Вставить("count",count);
+	Структура.Вставить("type",type);
+	Структура.Вставить("OrderVolumeInKg",OrderVolumeInKg);
+	
+
+	ЗаписьJSON = Новый ЗаписьJSON;
+	ЗаписьJSON.УстановитьСтроку();
+	ЗаписатьJSON(ЗаписьJSON, Структура);
+	
+	СтрокаJSON = ЗаписьJSON.Закрыть();
+	Возврат СтрокаJSON;

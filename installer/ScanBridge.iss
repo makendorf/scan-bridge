@@ -2,7 +2,7 @@
 ; Inno Setup 6+
 
 #define MyAppName "ScanBridge"
-#define MyAppVersion "2.0.4"
+#define MyAppVersion "2.0.6"
 #define MyAppPublisher "ScanBridge"
 #define MyAppURL "https://github.com/makendorf/scan-bridge"
 #define MyAppServiceName "ScanBridge"

@@ -1,4 +1,5 @@
 <Solution>
+  <Project Path="ScanBridgeExtention/ScanBridgeExtention.csproj" Id="4333fa6a-8195-4c1b-9ba9-1cc90ef6762f" />
   <Project Path="src/ScanBridge.csproj" />
   <Project Path="src/Tray/ScanBridgeTray.csproj" />
 </Solution>

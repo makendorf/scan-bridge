@@ -20,7 +20,7 @@ public class LogCollector
     {
         var record = new LogRecord
         {
-            Timestamp = DateTime.UtcNow,
+            Timestamp = DateTime.Now,
             Level = level,
             Message = message,
             Exception = exception
