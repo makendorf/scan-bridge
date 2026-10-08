@@ -1,4 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using ScanBridgeExtention.Models;
 using Serilog;
 using Serilog.Events;
 
@@ -19,26 +22,66 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     // Add services to the container.
+    var connectionString = builder.Configuration.GetConnectionString("NationalCataloge");
 
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(connectionString));
     builder.Services.AddControllers();
     // Регистрируем HttpClientFactory для выполнения внешних HTTP-запросов
     builder.Services.AddHttpClient();
     // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-    builder.Services.AddOpenApi();
-
-    builder.Services.AddCors(options =>
+    builder.Services.AddOpenApi(options =>
     {
-        options.AddPolicy("AllowAll", policy =>
+        options.AddDocumentTransformer((document, context, cancellationToken) =>
         {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
+            // 1. Центральный реестр описаний для всех тегов вашего API
+            // Добавляйте новые контроллеры сюда, просто добавляя новую пару ключ-значение
+            var tagDescriptions = new Dictionary<string, string>
+            {
+                {
+                    "Национальный каталог",
+                    """
+                    Набор эндпоинтов для взаимодействия с реестром товаров. 
+                    Поддерживает **умный поиск по вариациям GTIN** и оптимизированные пакетные запросы для высоконагруженных сценариев.
+                    """
+                },
+                {
+                    "xTrack Интеграция",
+                    """
+                    Эндпоинты для интеграции с внешней системой учета **xTrack**.
+                    Позволяет создавать производственные задания (заказы) с автоматической подстановкой параметров оборудования и встроенной Basic-аутентификацией.
+                    """
+                }
+                // Сюда можно легко добавить "Пользователи", "Отчеты" и т.д.
+            };
+
+            // 2. Гарантируем, что коллекция тегов инициализирована (защита от NullReferenceException)
+            document.Tags ??= new HashSet<OpenApiTag>();
+
+            // 3. Проходим по всем описаниям и либо обновляем существующий тег, либо добавляем новый
+            foreach (var kvp in tagDescriptions)
+            {
+                var existingTag = document.Tags.FirstOrDefault(t => t.Name == kvp.Key);
+
+                if (existingTag != null)
+                {
+                    existingTag.Description = kvp.Value;
+                }
+                else
+                {
+                    document.Tags.Add(new OpenApiTag
+                    {
+                        Name = kvp.Key,
+                        Description = kvp.Value
+                    });
+                }
+            }
+
+            return Task.CompletedTask;
         });
     });
 
     var app = builder.Build();
-
-    app.UseCors("AllowAll");
 
     // Configure the HTTP request pipeline.
     //if (app.Environment.IsDevelopment())

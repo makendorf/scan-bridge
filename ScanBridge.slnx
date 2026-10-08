@@ -1,5 +1,8 @@
 <Solution>
-  <Project Path="ScanBridgeExtention/ScanBridgeExtention.csproj" Id="4333fa6a-8195-4c1b-9ba9-1cc90ef6762f" />
+  <Project Path="ScanBridgeExtention/ScanBridgeExtention.csproj" />
   <Project Path="src/ScanBridge.csproj" />
   <Project Path="src/Tray/ScanBridgeTray.csproj" />
+  <Project Path="xTrackOrders/xTrackOrders.csproj" Id="a3766c66-2705-4e46-a69d-09ff52e219e5">
+    <Deploy Solution="Release|*" />
+  </Project>
 </Solution>

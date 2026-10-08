@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:xTrackOrders.ViewModels"
+             x:Class="xTrackOrders.Views.OrderPage"
+             Title="Создание заказа">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+
+            <Label Text="Создание заказа на производство" 
+                   FontSize="20" 
+                   FontAttributes="Bold" />
+
+            <!-- GTIN -->
+            <VerticalStackLayout>
+                <Label Text="GTIN *" />
+                <Entry Text="{Binding Gtin}" Placeholder="04780090861007" />
+            </VerticalStackLayout>
+
+            <!-- SKU -->
+            <VerticalStackLayout>
+                <Label Text="SKU" />
+                <Entry Text="{Binding Sku}" Placeholder="qwe" />
+            </VerticalStackLayout>
+
+            <!-- Количество -->
+            <VerticalStackLayout>
+                <Label Text="Количество" />
+                <Entry Text="{Binding Count}" Placeholder="1000" Keyboard="Numeric" />
+            </VerticalStackLayout>
+
+            <!-- Линия -->
+            <VerticalStackLayout>
+                <Label Text="ID линии" />
+                <Entry Text="{Binding LineId}" Placeholder="Linie_1" />
+            </VerticalStackLayout>
+
+            <!-- Организация -->
+            <Frame BorderColor="Gray" Padding="10" Margin="0,10,0,0">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Организация" FontAttributes="Bold" />
+
+                    <VerticalStackLayout>
+                        <Label Text="ИНН *" />
+                        <Entry Text="{Binding Inn}" Placeholder="7734391181" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="КПП *" />
+                        <Entry Text="{Binding Kpp}" Placeholder="771401001" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Серия -->
+            <Frame BorderColor="Gray" Padding="10">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Производственная серия" FontAttributes="Bold" />
+
+                    <VerticalStackLayout>
+                        <Label Text="Номер серии *" />
+                        <Entry Text="{Binding LotNumber}" Placeholder="23052022" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="Дата производства *" />
+                        <DatePicker Date="{Binding ProductDate}" />
+                    </VerticalStackLayout>
+
+                    <VerticalStackLayout>
+                        <Label Text="Срок годности *" />
+                        <DatePicker Date="{Binding ExpDate}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Режим -->
+            <VerticalStackLayout>
+                <Label Text="Режим создания заданий" />
+                <Picker SelectedItem="{Binding EquipmentTaskMode}">
+                    <Picker.Items>
+                        <x:String>printTask</x:String>
+                        <x:String>scanTasks</x:String>
+                        <x:String>printAndScanTasks</x:String>
+                    </Picker.Items>
+                </Picker>
+            </VerticalStackLayout>
+
+            <!-- Кнопка -->
+            <Button Text="Создать заказ"
+                    Command="{Binding CreateOrderCommand}"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertedBoolConverter}}"
+                    Margin="0,20,0,0" />
+
+            <!-- Индикатор загрузки -->
+            <ActivityIndicator IsRunning="{Binding IsLoading}"
+                               IsVisible="{Binding IsLoading}" />
+
+            <!-- Статус -->
+            <Label Text="{Binding StatusMessage}"
+                   TextColor="Gray"
+                   FontSize="14" />
+
+            <!-- ID заказа -->
+            <Label Text="{Binding OrderId, StringFormat='ID заказа: {0}'}"
+                   TextColor="Green"
+                   FontAttributes="Bold"
+                   IsVisible="{Binding OrderId, Converter={StaticResource IsNotNullOrEmptyConverter}}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
