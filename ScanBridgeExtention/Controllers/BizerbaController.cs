@@ -11,13 +11,13 @@ namespace ScanBridgeExtention.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    [Tags("Biserba")]
-    public class BiserbaController : ControllerBase
+    [Tags("Bizerba")]
+    public class BizerbaController : ControllerBase
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly Models.AppDbContext _context;
 
-        public BiserbaController(IHttpClientFactory httpClientFactory, Models.AppDbContext context)
+        public BizerbaController(IHttpClientFactory httpClientFactory, Models.AppDbContext context)
         {
             _httpClientFactory = httpClientFactory;
             _context = context;
@@ -193,6 +193,66 @@ namespace ScanBridgeExtention.Controllers
             }
 
             return Ok(results);
+        }
+
+        /// <summary>
+        /// Отправляет сообщение с датой заказа на указанную линию.
+        /// </summary>
+        /// <param name="connectName">Имя линии (connectName)</param>
+        /// <param name="orderID">GUID заказа</param>
+        [HttpGet("send-line-message")]
+        public async Task<IActionResult> SendLineMessage([FromQuery] string connectName, [FromQuery] Guid orderID)
+        {
+            if (string.IsNullOrWhiteSpace(connectName) || orderID == Guid.Empty)
+            {
+                return BadRequest(new { error = "Некорректный connectName или orderID" });
+            }
+
+            // 1. Получаем дату заказа, используя метод GetOrderInfo из PrismController
+            var prismController = new PrismController(_httpClientFactory);
+            var prismRequest = new OrderInfoSingleRequest { OrderId = orderID };
+            var actionResult = await prismController.GetOrderInfo(prismRequest);
+
+            // Проверяем, что метод вернул успешный результат (OkObjectResult) и данные
+            if (actionResult is not OkObjectResult okResult || okResult.Value is not List<OrderInfoResponse> orders || !orders.Any())
+            {
+                return BadRequest(new { error = "Не удалось получить дату заказа из Prism API", details = actionResult });
+            }
+
+            var orderInfo = orders.First();
+            if (!orderInfo.ДатаВыполненияРабот.HasValue)
+            {
+                return BadRequest(new { error = "Дата выполнения работ отсутствует для данного заказа" });
+            }
+
+            // Форматируем дату в формат DDMMYY (например, 081026)
+            var dateStr = orderInfo.ДатаВыполненияРабот.Value.ToString("ddMMyy");
+
+            // 2. Формируем URL для GET-запроса
+            var url = $"http://172.16.172.162:2020/ConnectService/json/SendMessage?connectName={connectName}&message=A!GL06|{dateStr}&timeout=200";
+
+            // 3. Выполняем GET-запрос к сервису линии
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                using var resp = await client.GetAsync(url);
+                var content = await resp.Content.ReadAsStringAsync();
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    return StatusCode((int)resp.StatusCode, new { error = "Ошибка при вызове ConnectService", status = resp.StatusCode, body = content });
+                }
+
+                return Ok(new { success = true, message = "Сообщение успешно отправлено", response = content });
+            }
+            catch (HttpRequestException ex)
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, new { error = "Ошибка сети при обращении к ConnectService", message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Внутренняя ошибка сервера", message = ex.Message });
+            }
         }
     }
 }

@@ -42,11 +42,11 @@ namespace ScanBridgeExtention.Controllers
         /// <response code="200">Заказ успешно создан. В теле ответа возвращается строка `orderId`.</response>
         /// <response code="400">Некорректные входные данные (отсутствуют DeviceName/LineId) или ошибка, возвращенная внешним API xTrack.</response>
         /// <response code="500">Внутренняя ошибка сервера (например, таймаут или недоступность внешнего API xTrack).</response>
-        [HttpPost("createClosingOrder")]
+        [HttpPost("create")]
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> CreateOrder([FromBody] CreateСlosingOrderRequest request)
+        public async Task<IActionResult> Create([FromBody] CreateСlosingOrderRequest request)
         {
             _logger.LogInformation("Получен запрос на создание заказа. DeviceName: {DeviceName}, LineId: {LineId}", request?.DeviceName, request?.LineId);
 
@@ -58,18 +58,7 @@ namespace ScanBridgeExtention.Controllers
 
             if (request.GTIN == "")
             {
-                switch (request.LineId)
-                {
-                    case "1":
-                        request.GTIN = "04607077972436";
-                        break;
-                    case "2":
-                        request.GTIN = "04607077976199";
-                        break;
-                    case "3":
-                        request.GTIN = "04607077976205";
-                        break;
-                }
+                request.GTIN = "04607077975734";
             }
 
             if (request.SKU == "")
@@ -80,7 +69,7 @@ namespace ScanBridgeExtention.Controllers
             var organisation = new { inn = "3127007309", kpp = "312701001" };
             string type = "serialisationaggregation";
             string equipmentTaskCreationMode = "printTaskCapture";
-            string count = "1";
+            string count = "1000";
 
             var date = DateTime.Now.ToShortDateString();
             var productSeries = new
